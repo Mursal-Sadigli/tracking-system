@@ -5,3 +5,5 @@ python-service/venv/
 .env
 frontend/.env
 *.log
+__pycache__/
+*.pyc
