@@ -1,8 +1,15 @@
 import { API_BASE_URL, ADMIN_API_KEY } from './config';
+import { isOperatorLoggedIn, getStoredUrlKey } from './auth/adminAuth';
 
 export function getAdminHeaders() {
     const headers = { Accept: 'application/json' };
-    if (ADMIN_API_KEY) headers['X-Admin-Key'] = ADMIN_API_KEY;
+    if (!ADMIN_API_KEY) return headers;
+    if (isOperatorLoggedIn()) {
+        headers['X-Admin-Key'] = ADMIN_API_KEY;
+        return headers;
+    }
+    const urlKey = getStoredUrlKey();
+    if (urlKey) headers['X-Admin-Key'] = urlKey;
     return headers;
 }
 

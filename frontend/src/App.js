@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import SubjectPage from './SubjectPage';
 import SubjectSessionPage from './SubjectSessionPage';
 import AdminPage from './AdminPage';
+import AdminGate from './auth/AdminGate';
 import WallMode from './command/WallMode';
 import WatchPage from './WatchPage';
 import { ADMIN_PATH, COMMAND_PATH } from './config';
@@ -18,8 +19,22 @@ function App() {
             <Route path="/" element={<SubjectPage />} />
             <Route path="/s/:token" element={<SubjectSessionPage />} />
             <Route path="/watch/:token" element={<WatchPage />} />
-            <Route path={adminRoute} element={<AdminPage />} />
-            <Route path={commandWall} element={<WallMode />} />
+            <Route
+                path={adminRoute}
+                element={
+                    <AdminGate>
+                        <AdminPage />
+                    </AdminGate>
+                }
+            />
+            <Route
+                path={commandWall}
+                element={
+                    <AdminGate>
+                        <WallMode />
+                    </AdminGate>
+                }
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );

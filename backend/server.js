@@ -7,7 +7,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const axios = require('axios');
 const { pool, initDB, runRetention } = require('./db');
-const { requireAdminKey } = require('./auth');
+const { requireAdminKey, handleAdminLogin } = require('./auth');
 const { createApiRouter } = require('./routes');
 const { attachSocketHandlers } = require('./socketHandlers');
 const { runAnalyticsBatch } = require('./pythonClient');
@@ -416,6 +416,8 @@ app.get('/api/devices/:deviceId/history', async (req, res) => {
 app.get('/api/compliance/consent/:caseId', requireAdminKey, (req, res) => {
     res.json({ logs: getConsentLogs(req.params.caseId) });
 });
+
+app.post('/api/admin/login', handleAdminLogin);
 
 app.post('/api/admin/retention-run', requireAdminKey, async (req, res) => {
     const days = Number(req.body?.days) || Number(process.env.DATA_RETENTION_DAYS) || 30;

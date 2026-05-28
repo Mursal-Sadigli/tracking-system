@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminHub from './AdminHub';
 import { apiGet } from './api';
-import { ADMIN_API_KEY } from './config';
 import { GPS_OPTIONS, clearLastKnownLocation, saveLastKnownLocation } from './geolocation';
+import { clearOperatorSession } from './auth/adminAuth';
+import { ADMIN_PATH } from './config';
 import './App.css';
 
 function AdminPage() {
@@ -13,7 +14,11 @@ function AdminPage() {
     const [backendOk, setBackendOk] = useState(null);
     const searchParams = new URLSearchParams(window.location.search);
     const testMode = searchParams.get('test') === 'true';
-    const keyOk = !ADMIN_API_KEY || searchParams.get('key') === ADMIN_API_KEY;
+
+    const handleLogout = () => {
+        clearOperatorSession();
+        window.location.href = ADMIN_PATH.startsWith('/') ? ADMIN_PATH : `/${ADMIN_PATH}`;
+    };
 
     const applyPermissionSuccess = (position) => {
         const { latitude, longitude, accuracy } = position.coords;
@@ -80,17 +85,6 @@ function AdminPage() {
 
     const showDashboard = locationEnabled || awaitingFreshGps;
 
-    if (!keyOk) {
-        return (
-            <div className="permission-container">
-                <div className="permission-dialog">
-                    <h2>Operator girişi</h2>
-                    <p>URL-ə admin açarı əlavə edin: ?key=...</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="App">
             <header className="app-header">
@@ -112,6 +106,14 @@ function AdminPage() {
                             Konum alınır...
                         </span>
                     )}
+                    <button
+                        type="button"
+                        className="admin-logout-btn"
+                        onClick={handleLogout}
+                        title="Çıxış"
+                    >
+                        Çıxış
+                    </button>
                 </div>
             </header>
 
