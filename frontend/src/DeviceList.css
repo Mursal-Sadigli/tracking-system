@@ -24,7 +24,12 @@
 
 .device-item:hover {
     background: #1a1a2e;
-    transform: translateX(5px);
+}
+
+@media (hover: hover) {
+    .device-item:hover {
+        transform: translateX(5px);
+    }
 }
 
 .device-item.selected {
@@ -34,14 +39,18 @@
 
 .device-header {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 4px;
     margin-bottom: 0.5rem;
 }
 
 .device-id {
     font-weight: bold;
     font-family: monospace;
+    font-size: clamp(0.75rem, 3vw, 0.9rem);
+    word-break: break-all;
 }
 
 .device-status {

@@ -12,6 +12,7 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { describeLocationQuality, googleMapsUrl } from './geolocation';
+import './MapComponent.css';
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
@@ -305,19 +306,7 @@ function MapComponent({
 
     if (!hasPosition) {
         return (
-            <div
-                style={{
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: '#f1f5f9',
-                    color: '#475569',
-                    padding: 24,
-                    textAlign: 'center',
-                    lineHeight: 1.5
-                }}
-            >
+            <div className="map-root map-root--empty">
                 📡 Konum hələ alınmayıb.
                 <br />
                 Brauzerdə icazə verin və GPS-i aktiv edin.
@@ -326,52 +315,18 @@ function MapComponent({
     }
 
     if (!mapMounted) {
-        return (
-            <div
-                style={{
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: '#f1f5f9',
-                    color: '#475569'
-                }}
-            >
-                Xəritə yüklənir...
-            </div>
-        );
+        return <div className="map-root map-root--loading">Xəritə yüklənir...</div>;
     }
 
     return (
-        <div style={{ position: 'relative', height: '100%', width: '100%' }}>
-            <div
-                className="map-layer-switch"
-                style={{
-                    position: 'absolute',
-                    zIndex: 1000,
-                    top: 10,
-                    left: 10,
-                    background: 'white',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                }}
-            >
+        <div className="map-root">
+            <div className="map-layer-switch">
                 {['street', 'satellite', 'terrain'].map((layer) => (
                     <button
                         key={layer}
                         type="button"
+                        className={`map-layer-btn${mapLayer === layer ? ' is-active' : ''}`}
                         onClick={() => setMapLayer(layer)}
-                        style={{
-                            marginRight: '6px',
-                            border: mapLayer === layer ? '1px solid #2563eb' : '1px solid #d1d5db',
-                            background: mapLayer === layer ? '#eff6ff' : 'white',
-                            color: '#111827',
-                            borderRadius: '6px',
-                            padding: '4px 8px',
-                            cursor: 'pointer',
-                            fontWeight: 600
-                        }}
                     >
                         {layer === 'street' ? 'Street' : layer === 'satellite' ? 'Satellite' : 'Terrain'}
                     </button>

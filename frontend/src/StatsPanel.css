@@ -5,9 +5,15 @@
 
 .stats-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
     margin-bottom: 1rem;
+}
+
+@media (min-width: 480px) {
+    .stats-cards {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 .stat-card {
@@ -20,7 +26,7 @@
 }
 
 .stat-value {
-    font-size: 1.5rem;
+    font-size: clamp(1.1rem, 4vw, 1.5rem);
     font-weight: bold;
     color: #e94560;
 }

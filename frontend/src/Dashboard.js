@@ -58,6 +58,7 @@ function Dashboard({ onConnectionChange }) {
     const [cityRoads, setCityRoads] = useState([]);
     const [isSimulating, setIsSimulating] = useState(false);
     const [currentDeviceId, setCurrentDeviceId] = useState(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const deviceInfoRef = useRef(getDeviceInfo());
     const lastSeenRef = useRef({});
@@ -194,36 +195,41 @@ function Dashboard({ onConnectionChange }) {
 
     const handleDeviceSelect = (device) => {
         setSelectedDevice(device);
+        setSidebarOpen(true);
         if (socketRef.current) {
             socketRef.current.emit('get_history', device.device_id);
         }
     };
 
+    const bannerClass =
+        showHttpWarning || showFallbackWarning
+            ? 'dashboard-banner dashboard-banner--warn'
+            : 'dashboard-banner dashboard-banner--info';
+
     return (
-        <div className="dashboard">
+        <div className={`dashboard${sidebarOpen ? ' dashboard--panel-open' : ''}`}>
             <AlertPanel />
+
+            <button
+                type="button"
+                className="sidebar-fab"
+                onClick={() => setSidebarOpen((open) => !open)}
+                aria-expanded={sidebarOpen}
+                aria-label="Paneli aç"
+            >
+                {sidebarOpen ? '✕ Bağla' : '☰ Panel'}
+            </button>
+
+            <button
+                type="button"
+                className={`sidebar-overlay${sidebarOpen ? ' is-visible' : ''}`}
+                aria-label="Paneli bağla"
+                onClick={() => setSidebarOpen(false)}
+            />
 
             <div className="dashboard-main">
                 {(showHttpWarning || showFallbackWarning || locationRefining) && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            zIndex: 1100,
-                            top: 72,
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            maxWidth: 'min(92vw, 440px)',
-                            background: showHttpWarning || showFallbackWarning ? '#fef2f2' : '#fef3c7',
-                            color: showHttpWarning || showFallbackWarning ? '#991b1b' : '#92400e',
-                            padding: '10px 14px',
-                            borderRadius: 8,
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            textAlign: 'center',
-                            lineHeight: 1.45
-                        }}
-                    >
+                    <div className={bannerClass}>
                         {showHttpWarning ? (
                             <>
                                 ⚠️ Sayt <strong>http://</strong> ilə açılıb — telefonda dəqiq GPS adətən
@@ -238,38 +244,17 @@ function Dashboard({ onConnectionChange }) {
                         ) : (
                             '📡 Daha dəqiq GPS gözlənilir...'
                         )}
-                        <div style={{ marginTop: 8 }}>
-                            <button
-                                type="button"
-                                onClick={handleRefreshLocation}
-                                style={{
-                                    padding: '6px 12px',
-                                    borderRadius: 6,
-                                    border: '1px solid #cbd5e1',
-                                    background: 'white',
-                                    cursor: 'pointer',
-                                    fontSize: 12
-                                }}
-                            >
-                                🔄 Konumu yenilə
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            className="dashboard-banner__btn"
+                            onClick={handleRefreshLocation}
+                        >
+                            🔄 Konumu yenilə
+                        </button>
                     </div>
                 )}
                 {userLocation?.quality && !locationRefining && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            zIndex: 1100,
-                            top: 72,
-                            left: 10,
-                            background: 'white',
-                            padding: '6px 12px',
-                            borderRadius: 8,
-                            fontSize: 12,
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                        }}
-                    >
+                    <div className="dashboard-quality-badge">
                         {describeLocationQuality(userLocation.quality, userLocation.accuracy)}
                     </div>
                 )}
@@ -284,7 +269,7 @@ function Dashboard({ onConnectionChange }) {
                 />
             </div>
 
-            <div className="dashboard-sidebar">
+            <div className={`dashboard-sidebar${sidebarOpen ? ' is-open' : ''}`}>
                 <CitySelector
                     onCitySelect={(data) => {
                         setCityRoads(data.roads);

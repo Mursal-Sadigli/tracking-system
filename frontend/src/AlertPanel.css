@@ -1,11 +1,29 @@
 .alert-panel {
     position: fixed;
-    top: 80px;
-    right: 20px;
-    z-index: 1000;
-    max-width: 400px;
-    max-height: 500px;
+    top: auto;
+    bottom: 72px;
+    left: 8px;
+    right: 8px;
+    z-index: 1050;
+    max-width: none;
+    max-height: 35dvh;
     overflow-y: auto;
+    pointer-events: none;
+}
+
+.alert-panel .alert-item {
+    pointer-events: auto;
+}
+
+@media (min-width: 768px) {
+    .alert-panel {
+        top: 80px;
+        bottom: auto;
+        left: auto;
+        right: 20px;
+        max-width: 400px;
+        max-height: 500px;
+    }
 }
 
 .alert-item {
