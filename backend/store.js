@@ -14,7 +14,9 @@ const store = {
     missionPhases: new Map(),
     geofences: new Map(),
     coLocationEvents: [],
-    operatorSessions: new Map()
+    operatorSessions: new Map(),
+    visitHistory: [],
+    shareLinks: new Map()
 };
 
 function serialize() {
@@ -28,7 +30,9 @@ function serialize() {
         missionPhases: Array.from(store.missionPhases.entries()),
         geofences: Array.from(store.geofences.entries()),
         coLocationEvents: store.coLocationEvents.slice(-500),
-        operatorSessions: Array.from(store.operatorSessions.entries())
+        operatorSessions: Array.from(store.operatorSessions.entries()),
+        visitHistory: store.visitHistory || [],
+        shareLinks: Array.from((store.shareLinks || new Map()).entries())
     };
 }
 
@@ -44,6 +48,8 @@ function hydrate(data) {
     store.geofences = new Map(data.geofences || []);
     store.coLocationEvents = data.coLocationEvents || [];
     store.operatorSessions = new Map(data.operatorSessions || []);
+    store.visitHistory = data.visitHistory || [];
+    store.shareLinks = new Map(data.shareLinks || []);
 }
 
 function persist() {

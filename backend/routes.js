@@ -1,11 +1,13 @@
 const express = require('express');
-const cases = require('./cases');
 const { getCaseEvents } = require('./events');
 const mission = require('./mission');
 const { store } = require('./store');
 const { getCoLocationEvents, buildDwellZones, buildHeatmapFromHistories } = require('./intel');
 const { runAnalyticsBatch, generateBriefing, runIntelProfile } = require('./pythonClient');
 const { pool, DB_ENABLED } = require('./db');
+const visits = require('./visits');
+const shareLinks = require('./shareLinks');
+const cases = require('./cases');
 
 function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
     const router = express.Router();
@@ -168,6 +170,35 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
         const history = deviceHistory.get(req.params.deviceId) || [];
         const score = await runAnalyticsBatch(history);
         res.json({ deviceId: req.params.deviceId, ...score, points: history.length });
+    });
+
+    router.get('/visits', admin, (req, res) => {
+        res.json({ visits: visits.listVisits(Number(req.query.limit) || 100) });
+    });
+
+    router.post('/cases/:caseId/share', admin, (req, res) => {
+        const minutes = Number(req.body.expires_minutes) || 60;
+        const link = shareLinks.createShareLink(req.params.caseId, minutes);
+        const base = req.body.frontend_base || '';
+        res.status(201).json({
+            ...link,
+            path: `/watch/${link.token}`,
+            url: `${base}/watch/${link.token}`
+        });
+    });
+
+    router.get('/share/:token', (req, res) => {
+        const link = shareLinks.getShareLink(req.params.token);
+        if (!link) return res.status(404).json({ error: 'expired_or_invalid' });
+        const c = cases.getCaseById(link.case_id);
+        const device = c ? activeDevices.get(c.device_id) : null;
+        res.json({
+            valid: true,
+            case_id: link.case_id,
+            title: c?.title,
+            expires_at: link.expires_at,
+            device: device || null
+        });
     });
 
     return router;

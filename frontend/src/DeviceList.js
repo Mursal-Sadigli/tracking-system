@@ -3,7 +3,12 @@ import './DeviceList.css';
 
 function DeviceList({ devices, onSelect, selectedId, currentDeviceId = null }) {
     const userDevices = devices
-        .filter((d) => d.device_id?.startsWith('user_') && d.lat != null && d.lon != null)
+        .filter(
+            (d) =>
+                (d.device_id?.startsWith('user_') || d.device_id?.startsWith('case_')) &&
+                d.lat != null &&
+                d.lon != null
+        )
         .sort((a, b) => new Date(b.lastUpdate || 0) - new Date(a.lastUpdate || 0));
 
     return (
@@ -67,7 +72,13 @@ function DeviceList({ devices, onSelect, selectedId, currentDeviceId = null }) {
                                     <div>
                                         📍 {device.lat?.toFixed(5)}, {device.lon?.toFixed(5)}
                                     </div>
-                                    <div>⚡ {((device.speed || 0) * 3.6).toFixed(1)} km/h</div>
+                                    <div>
+                                        ⚡ {(device.speed_kmh ?? (device.speed || 0) * 3.6).toFixed(1)} km/saat
+                                    </div>
+                                    <div>
+                                        {device.network_online === false ? '🔴 Offline' : '🟢 Online'}
+                                        {device.isp ? ` • ${device.isp}` : ''}
+                                    </div>
                                     <div className="device-time">
                                         {device.lastUpdate
                                             ? new Date(device.lastUpdate).toLocaleTimeString()

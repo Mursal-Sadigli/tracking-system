@@ -6,22 +6,50 @@ const { store } = require('./store');
 const { updateSubjectPosition } = require('./intel');
 const { logConsent } = require('./compliance');
 const { pool, DB_ENABLED } = require('./db');
+const visits = require('./visits');
+const { lookupIp } = require('./ipLookup');
+const { detectAnomalies } = require('./anomalyDetector');
 
 const geofenceStateByDevice = new Map();
 const missionDwellByCase = new Map();
 const lastDeviationAlert = new Map();
+const lastAnomalyEmit = new Map();
+
+function getClientIp(socket) {
+    const forwarded = socket.handshake.headers['x-forwarded-for'];
+    if (forwarded) return String(forwarded).split(',')[0].trim();
+    return String(socket.handshake.address || '').replace('::ffff:', '');
+}
 
 function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
-    io.on('connection', (socket) => {
+    io.on('connection', async (socket) => {
         console.log('🔌 Client connected:', socket.id);
 
-        socket.emit(
-            'active_devices',
-            Array.from(activeDevices.entries()).map(([id, data]) => ({
-                device_id: id,
-                ...data
-            }))
-        );
+        const clientIp = getClientIp(socket);
+        const ipInfo = await lookupIp(clientIp);
+        socket.clientIp = clientIp;
+        socket.ipInfo = ipInfo;
+
+        visits.startVisit(socket.id, {
+            ip: clientIp,
+            isp: ipInfo.isp,
+            org: ipInfo.org,
+            user_agent: socket.handshake.headers['user-agent'] || ''
+        });
+
+        socket.emit('active_devices', Array.from(activeDevices.entries()).map(([id, data]) => ({
+            device_id: id,
+            ...data
+        })));
+
+        socket.emit('connection_info', {
+            ip: clientIp,
+            isp: ipInfo.isp,
+            org: ipInfo.org,
+            city: ipInfo.city,
+            country: ipInfo.country,
+            mobile_network: ipInfo.mobile
+        });
 
         socket.on('register_subject', async (data) => {
             const token = data?.subject_token;
@@ -35,10 +63,19 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
             socket.subjectDeviceId = c.device_id;
             socket.join(`case:${c.case_id}`);
 
+            visits.markConsent(socket.id);
+            const v = visits.activeVisits.get(socket.id);
+            if (v) {
+                v.case_id = c.case_id;
+                v.subject_token = token;
+                v.device_type = data?.device_meta?.device_type;
+                v.browser = data?.device_meta?.browser;
+            }
+
             await logConsent({
                 case_id: c.case_id,
                 subject_token: token,
-                ip: socket.handshake.headers['x-forwarded-for']?.split(',')[0] || socket.handshake.address,
+                ip: clientIp,
                 user_agent: socket.handshake.headers['user-agent'],
                 consent_text: data?.consent_text
             });
@@ -47,7 +84,7 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                 type: 'consent_granted',
                 case_id: c.case_id,
                 device_id: c.device_id,
-                payload: { title: c.title }
+                payload: { title: c.title, ip: clientIp, isp: ipInfo.isp }
             });
 
             socket.emit('subject_registered', {
@@ -76,6 +113,8 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                 caseRecord = cases.getCaseById(socket.subjectCaseId);
             }
 
+            visits.incrementGps(socket.id);
+
             const {
                 latitude,
                 longitude,
@@ -83,34 +122,46 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                 accuracy,
                 heading,
                 battery_level,
+                battery_charging,
                 device_name,
                 device_type,
                 user_agent,
                 browser,
                 location_quality,
-                address
+                address,
+                network
             } = data;
 
             const timestamp = new Date();
+            const speedKmh = toKmh(speed);
             const isMoving = (speed || 0) > 0.3;
             const displayName = caseRecord?.title || device_name || 'Unknown Device';
+            const networkOnline = network?.online ?? true;
 
             activeDevices.set(device_id, {
                 lat: latitude,
                 lon: longitude,
                 speed: speed || 0,
+                speed_kmh: Math.round(speedKmh * 10) / 10,
                 heading: heading || 0,
                 is_moving: isMoving,
                 lastUpdate: timestamp,
                 accuracy: accuracy ?? null,
                 location_quality: location_quality || 'unknown',
                 battery_level: battery_level || 100,
+                battery_charging: battery_charging ?? false,
                 device_name: displayName,
                 device_type: device_type || 'Unknown',
                 user_agent: user_agent || '',
                 browser: browser || 'Unknown',
                 address: address || '',
-                case_id: caseRecord?.case_id || null
+                case_id: caseRecord?.case_id || null,
+                ip: socket.clientIp,
+                isp: socket.ipInfo?.isp || null,
+                org: socket.ipInfo?.org || null,
+                network_online: networkOnline,
+                network_type: network?.effective_type || null,
+                os: data.os || null
             });
 
             const history = deviceHistory.get(device_id) || [];
@@ -118,6 +169,7 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                 lat: latitude,
                 lon: longitude,
                 speed,
+                speed_kmh: speedKmh,
                 heading: heading || 0,
                 timestamp,
                 is_moving: isMoving,
@@ -126,6 +178,27 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
             });
             if (history.length > 500) history.shift();
             deviceHistory.set(device_id, history);
+
+            const speedLimit = caseRecord?.speed_limit_kmh || 80;
+            const anomalies = await detectAnomalies(history, speedKmh, speedLimit);
+            if (anomalies.length && caseRecord) {
+                const key = `${device_id}_${anomalies[0].type}`;
+                const last = lastAnomalyEmit.get(key) || 0;
+                if (Date.now() - last > 60000) {
+                    lastAnomalyEmit.set(key, Date.now());
+                    await emitCaseEvent(io, {
+                        type: 'ai_anomaly',
+                        case_id: caseRecord.case_id,
+                        device_id,
+                        payload: { anomalies, primary: anomalies[0] }
+                    });
+                    io.emit('ai_anomaly_alert', {
+                        device_id,
+                        case_id: caseRecord.case_id,
+                        anomalies
+                    });
+                }
+            }
 
             if (caseRecord) {
                 updateSubjectPosition(device_id, latitude, longitude, caseRecord.case_id);
@@ -152,11 +225,7 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                     });
                 }
 
-                const deviation = mission.computeDeviation(
-                    latitude,
-                    longitude,
-                    caseRecord.case_id
-                );
+                const deviation = mission.computeDeviation(latitude, longitude, caseRecord.case_id);
                 const lastDev = lastDeviationAlert.get(caseRecord.case_id);
                 if (!deviation.in_corridor && (!lastDev || Date.now() - lastDev > 120000)) {
                     lastDeviationAlert.set(caseRecord.case_id, Date.now());
@@ -185,13 +254,12 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                     });
                 }
 
-                const speedKmh = toKmh(speed);
-                if (speedKmh > (caseRecord.speed_limit_kmh || 80)) {
+                if (speedKmh > speedLimit) {
                     await emitCaseEvent(io, {
                         type: 'speed_exceeded',
                         case_id: caseRecord.case_id,
                         device_id,
-                        payload: { speed_kmh: speedKmh, limit: caseRecord.speed_limit_kmh }
+                        payload: { speed_kmh: speedKmh, limit: speedLimit }
                     });
                 }
             }
@@ -226,9 +294,11 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                 latitude,
                 longitude,
                 speed: speed || 0,
+                speed_kmh: speedKmh,
                 heading: heading || 0,
                 is_moving: isMoving,
                 battery_level: battery_level || 100,
+                battery_charging: battery_charging ?? false,
                 accuracy: accuracy ?? null,
                 location_quality: location_quality || 'unknown',
                 timestamp: timestamp.toISOString(),
@@ -236,6 +306,12 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                 device_type: device_type || 'Unknown',
                 browser: browser || 'Unknown',
                 address: address || '',
+                ip: socket.clientIp,
+                isp: socket.ipInfo?.isp,
+                org: socket.ipInfo?.org,
+                network_online: networkOnline,
+                network_type: network?.effective_type || null,
+                anomalies,
                 deviation: caseRecord
                     ? mission.computeDeviation(latitude, longitude, caseRecord.case_id)
                     : null
@@ -243,6 +319,8 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
         });
 
         socket.on('disconnect', () => {
+            visits.endVisit(socket.id, 'disconnect');
+
             const deviceIdToRemove = socket.subjectDeviceId || 'user_' + socket.id;
             if (activeDevices.has(deviceIdToRemove)) {
                 const c = cases.getCaseByDeviceId(deviceIdToRemove);
@@ -251,7 +329,7 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                         type: 'subject_offline',
                         case_id: c.case_id,
                         device_id: deviceIdToRemove,
-                        payload: {}
+                        payload: { ip: socket.clientIp }
                     });
                 }
                 activeDevices.delete(deviceIdToRemove);

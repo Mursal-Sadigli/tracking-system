@@ -7,6 +7,7 @@ import {
     shouldUpdateDisplayedPosition,
     haversineMeters
 } from '../geolocation';
+import { getNetworkInfo } from '../deviceInfo';
 
 function calculateHeading(prevLat, prevLon, currLat, currLon) {
     const dLon = ((currLon - prevLon) * Math.PI) / 180;
@@ -160,20 +161,25 @@ export function useLocationTracker({
 
             lastLocationRef.current = { latitude, longitude, timestamp: now };
 
+            const speedKmh = calculatedSpeed * 3.6;
             const devicePatch = {
                 device_id: deviceId,
                 lat: latitude,
                 lon: longitude,
                 speed: calculatedSpeed,
+                speed_kmh: Math.round(speedKmh * 10) / 10,
                 heading,
                 is_moving: calculatedSpeed > 0.3,
                 battery_level: batteryRef.current.level,
+                battery_charging: batteryRef.current.charging,
                 accuracy,
                 location_quality: quality,
                 lastUpdate: new Date(now).toISOString(),
                 device_name: deviceInfo?.device_name,
                 device_type: deviceInfo?.device_type,
-                browser: deviceInfo?.browser
+                browser: deviceInfo?.browser,
+                network_online: navigator.onLine,
+                network_type: getNetworkInfo().effective_type
             };
 
             callbacksRef.current.onDevicesChange?.((prev) => {
@@ -208,7 +214,9 @@ export function useLocationTracker({
                 device_name: deviceInfo?.device_name,
                 device_type: deviceInfo?.device_type,
                 browser: deviceInfo?.browser,
-                user_agent: deviceInfo?.user_agent
+                user_agent: deviceInfo?.user_agent,
+                os: deviceInfo?.os,
+                network: getNetworkInfo()
             });
         };
 
@@ -261,7 +269,12 @@ export function useLocationTracker({
             if (subjectTokenRef.current) {
                 socket.emit('register_subject', {
                     subject_token: subjectTokenRef.current,
-                    consent_text: consentTextRef.current
+                    consent_text: consentTextRef.current,
+                    device_meta: {
+                        device_type: deviceInfo?.device_type,
+                        browser: deviceInfo?.browser,
+                        os: deviceInfo?.os
+                    }
                 });
                 return;
             }
@@ -293,15 +306,23 @@ export function useLocationTracker({
                 lat: data.latitude,
                 lon: data.longitude,
                 speed: data.speed,
+                speed_kmh: data.speed_kmh ?? (data.speed || 0) * 3.6,
                 heading: data.heading || 0,
                 is_moving: data.is_moving,
                 battery_level: data.battery_level || 100,
+                battery_charging: data.battery_charging,
                 accuracy: data.accuracy,
                 location_quality: data.location_quality,
                 lastUpdate: data.timestamp,
                 device_name: data.device_name,
                 device_type: data.device_type,
-                browser: data.browser
+                browser: data.browser,
+                ip: data.ip,
+                isp: data.isp,
+                org: data.org,
+                network_online: data.network_online,
+                network_type: data.network_type,
+                anomalies: data.anomalies
             };
 
             if (data.device_id === userDeviceIdRef.current) {
@@ -383,6 +404,7 @@ export function useLocationTracker({
         deviceInfo?.browser,
         deviceInfo?.device_type,
         deviceInfo?.user_agent,
+        deviceInfo?.os,
         subjectToken,
         consentText
     ]);

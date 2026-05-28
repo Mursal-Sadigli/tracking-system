@@ -171,6 +171,23 @@ function Dashboard({ onConnectionChange }) {
         fetchAnalytics();
     }, [selectedDevice]);
 
+    useEffect(() => {
+        const socket = socketRef.current;
+        if (!socket) return undefined;
+        const onAiAnomaly = (payload) => {
+            const primary = payload.anomalies?.[0];
+            if (primary) {
+                alertManager.addAlert(
+                    ALERT_TYPES.SPEED_ALERT,
+                    `AI: ${primary.explanation_az || primary.type}`,
+                    primary.severity === 'high' ? ALERT_SEVERITY.CRITICAL : ALERT_SEVERITY.WARNING
+                );
+            }
+        };
+        socket.on('ai_anomaly_alert', onAiAnomaly);
+        return () => socket.off('ai_anomaly_alert', onAiAnomaly);
+    }, [socketRef]);
+
     const handleDeviceSelect = (device) => {
         setSelectedDevice(device);
         setSidebarOpen(true);

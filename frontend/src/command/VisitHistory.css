@@ -1,0 +1,44 @@
+.visit-history {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #334155;
+}
+
+.visit-history ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.visit-history li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #334155;
+    font-size: 0.8rem;
+}
+
+.visit-history li.is-brief {
+    border-left: 3px solid #f59e0b;
+    padding-left: 0.5rem;
+}
+
+.visit-history__hint {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.visit-history__meta {
+    color: #94a3b8;
+    font-size: 0.75rem;
+}
+
+.visit-history__row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.visit-history__empty {
+    color: #64748b;
+}

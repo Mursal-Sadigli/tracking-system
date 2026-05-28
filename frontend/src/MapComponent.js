@@ -12,6 +12,7 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { describeLocationQuality, googleMapsUrl } from './geolocation';
+import MapLibre3D from './MapLibre3D';
 import './MapComponent.css';
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -262,6 +263,7 @@ function MapComponent({
 }) {
     const mapKey = useId();
     const [mapLayer, setMapLayer] = useState('street');
+    const [mapMode, setMapMode] = useState('2d');
     const [mapReady, setMapReady] = useState(false);
     const [mapMounted, setMapMounted] = useState(false);
 
@@ -288,7 +290,10 @@ function MapComponent({
     const zonesToRender = riskZones.length ? liveRiskZones : [];
 
     const trackedDevices = devices.filter(
-        (d) => d.lat != null && d.lon != null && d.device_id?.startsWith('user_')
+        (d) =>
+            d.lat != null &&
+            d.lon != null &&
+            (d.device_id?.startsWith('user_') || d.device_id?.startsWith('case_'))
     );
 
     const myDevice = currentDeviceId
@@ -325,14 +330,31 @@ function MapComponent({
                     <button
                         key={layer}
                         type="button"
-                        className={`map-layer-btn${mapLayer === layer ? ' is-active' : ''}`}
-                        onClick={() => setMapLayer(layer)}
+                        className={`map-layer-btn${mapLayer === layer && mapMode === '2d' ? ' is-active' : ''}`}
+                        onClick={() => {
+                            setMapMode('2d');
+                            setMapLayer(layer);
+                        }}
                     >
                         {layer === 'street' ? 'Street' : layer === 'satellite' ? 'Satellite' : 'Terrain'}
                     </button>
                 ))}
+                <button
+                    type="button"
+                    className={`map-layer-btn${mapMode === '3d' ? ' is-active' : ''}`}
+                    onClick={() => setMapMode('3d')}
+                >
+                    3D
+                </button>
             </div>
 
+            {mapMode === '3d' ? (
+                <MapLibre3D
+                    devices={trackedDevices}
+                    centerLat={markerLat}
+                    centerLon={markerLon}
+                />
+            ) : (
             <LeafletMapInstance
                 mapKey={mapKey}
                 markerLat={markerLat}
@@ -348,6 +370,7 @@ function MapComponent({
                 selectedDevice={selectedDevice}
                 mapReady={mapReady}
             />
+            )}
         </div>
     );
 }

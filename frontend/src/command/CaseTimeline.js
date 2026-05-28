@@ -8,6 +8,7 @@ const LABELS = {
     speed_exceeded: 'Sürət limiti',
     phase_completed: 'Faza tamamlandı',
     subject_offline: 'Offline',
+    ai_anomaly: 'AI anomaliya',
     note: 'Qeyd'
 };
 

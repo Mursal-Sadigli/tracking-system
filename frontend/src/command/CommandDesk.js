@@ -4,6 +4,8 @@ import { getTrackingSocket } from '../socketService';
 import { apiGet, apiPost } from '../api';
 import CaseTimeline from './CaseTimeline';
 import LinkGenerator from './LinkGenerator';
+import VisitHistory from './VisitHistory';
+import ShareLinkButton from './ShareLinkButton';
 import './CommandDesk.css';
 
 function CommandDesk({ wallMode = false, onCaseSelect }) {
@@ -74,8 +76,22 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
             if (selected?.case_id === ev.case_id) loadEvents(ev.case_id);
         };
 
+        const onAnomaly = (payload) => {
+            setEvents((prev) => [
+                {
+                    id: `evt_anom_${Date.now()}`,
+                    type: 'ai_anomaly',
+                    case_id: payload.case_id,
+                    ts: new Date().toISOString(),
+                    payload: { primary: payload.anomalies?.[0] }
+                },
+                ...prev
+            ].slice(0, 80));
+        };
+
         socket.on('location_update', onLocation);
         socket.on('case_event', onCaseEvent);
+        socket.on('ai_anomaly_alert', onAnomaly);
 
         apiGet('/api/devices')
             .then((list) => {
@@ -97,6 +113,7 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
         return () => {
             socket.off('location_update', onLocation);
             socket.off('case_event', onCaseEvent);
+            socket.off('ai_anomaly_alert', onAnomaly);
         };
     }, [selected, loadEvents]);
 
@@ -140,6 +157,7 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
         <div className={`command-desk${wallMode ? ' command-desk--wall' : ''}`}>
             <aside className="command-desk__sidebar">
                 <LinkGenerator onCaseCreated={(c) => { loadCases(); setSelected(c); }} />
+                <VisitHistory />
                 <div className="command-desk__operator">
                     <label>
                         Operator ID
@@ -189,6 +207,22 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
                                 {selected.accuracy != null && ` ±${Math.round(selected.accuracy)}m`}
                             </p>
                         )}
+                        <p className="command-desk__meta">
+                            ⚡ Sürət:{' '}
+                            <strong>{(selected.speed_kmh ?? (selected.speed || 0) * 3.6).toFixed(1)} km/saat</strong>
+                        </p>
+                        <p className="command-desk__meta">
+                            {selected.network_online === false ? '🔴 İnternet yox' : '🟢 Online'}
+                            {selected.network_type && ` • ${selected.network_type}`}
+                        </p>
+                        {selected.ip && (
+                            <p className="command-desk__meta">
+                                IP: {selected.ip}
+                                {selected.isp && ` • ${selected.isp}`}
+                                {selected.org && ` (${selected.org})`}
+                            </p>
+                        )}
+                        <ShareLinkButton caseId={selected.case_id} />
                         <button type="button" className="command-desk__handoff" onClick={handoff}>
                             Təhvil ver (handoff)
                         </button>
