@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Dashboard from './Dashboard';
 import { apiGet } from './api';
 import { GPS_OPTIONS, clearLastKnownLocation, saveLastKnownLocation } from './geolocation';
@@ -23,7 +23,7 @@ function App() {
         localStorage.setItem('locationGranted', 'true');
     };
 
-    const requestFreshLocation = (clearCache = false) => {
+    const requestFreshLocation = useCallback((clearCache = false) => {
         if (!navigator.geolocation) return;
 
         if (clearCache) {
@@ -43,7 +43,7 @@ function App() {
             },
             GPS_OPTIONS
         );
-    };
+    }, []);
 
     useEffect(() => {
         const checkBackend = async () => {
@@ -72,7 +72,7 @@ function App() {
         }
 
         // İlk dəfə: avtomatik sorğu yox – istifadəçi düyməyə bassın
-    }, [testMode]);
+    }, [testMode, requestFreshLocation]);
 
     const handleRequestPermission = () => {
         requestFreshLocation(true);

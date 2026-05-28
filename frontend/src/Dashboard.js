@@ -6,7 +6,7 @@ import AlertPanel from './AlertPanel';
 import PathPlayback from './PathPlayback';
 import ExportPanel from './ExportPanel';
 import CitySelector from './CitySelector';
-import alertManager, { ALERT_TYPES, ALERT_SEVERITY, SPEED_THRESHOLD, OFFLINE_TIMEOUT } from './AlertManager';
+import alertManager, { ALERT_TYPES, ALERT_SEVERITY, OFFLINE_TIMEOUT } from './AlertManager';
 import { useLocationTracker } from './hooks/useLocationTracker';
 import { apiGet } from './api';
 import {

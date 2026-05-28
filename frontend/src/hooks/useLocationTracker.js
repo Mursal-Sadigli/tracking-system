@@ -348,7 +348,14 @@ export function useLocationTracker({
             releaseTrackingSocket();
             socketRef.current = null;
         };
-    }, [enabled, testMode, deviceInfo?.device_name, deviceInfo?.browser, deviceInfo?.device_type]);
+    }, [
+        enabled,
+        testMode,
+        deviceInfo?.device_name,
+        deviceInfo?.browser,
+        deviceInfo?.device_type,
+        deviceInfo?.user_agent
+    ]);
 
     return {
         socketRef,
