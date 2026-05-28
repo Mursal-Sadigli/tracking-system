@@ -1,18 +1,40 @@
 const mysql = require('mysql2');
 
-const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'tracking_user',
-    password: '',  // Şifrə yoxdur
-    database: 'tracking_db',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+/** Render-də DB_HOST yoxdursa MySQL söndürülür; yerli inkişafda localhost istifadə olunur */
+const DB_ENABLED =
+    process.env.DB_HOST != null && String(process.env.DB_HOST).trim() !== ''
+        ? true
+        : process.env.RENDER !== 'true';
 
-const promisePool = pool.promise();
+const noopPool = {
+    execute: async () => [[]],
+    query: async () => [{ affectedRows: 0 }]
+};
+
+let promisePool = noopPool;
+
+if (DB_ENABLED) {
+    const pool = mysql.createPool({
+        host: process.env.DB_HOST || 'localhost',
+        port: Number(process.env.DB_PORT) || 3306,
+        user: process.env.DB_USER || 'tracking_user',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'tracking_db',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+    });
+    promisePool = pool.promise();
+}
 
 async function initDB() {
+    if (!DB_ENABLED) {
+        console.log(
+            'ℹ️ MySQL söndürülüb — real-time izləmə yaddaşda işləyir. DB üçün Render-də DB_HOST və s. env əlavə edin.'
+        );
+        return;
+    }
+
     try {
         await promisePool.execute(`
             CREATE TABLE IF NOT EXISTS users (
@@ -52,8 +74,8 @@ async function initDB() {
 
         console.log('✅ MySQL database initialized');
     } catch (error) {
-        console.error('❌ Database error:', error);
+        console.error('❌ Database error:', error.message || error);
     }
 }
 
-module.exports = { pool: promisePool, initDB };
+module.exports = { pool: promisePool, initDB, DB_ENABLED };
