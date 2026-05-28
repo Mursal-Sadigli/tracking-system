@@ -1,0 +1,160 @@
+.playback-panel {
+    background: white;
+    border: 2px solid #3b82f6;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 10px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.playback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.playback-header h3 {
+    margin: 0;
+    color: #1f2937;
+    font-size: 16px;
+}
+
+.close-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s;
+}
+
+.close-btn:hover {
+    background: #dc2626;
+}
+
+.playback-info {
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #374151;
+}
+
+.playback-info div {
+    margin: 6px 0;
+}
+
+.playback-info strong {
+    color: #1f2937;
+}
+
+.playback-timeline {
+    margin: 12px 0;
+}
+
+.timeline-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #e5e7eb;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.timeline-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.timeline-slider::-webkit-slider-thumb:hover {
+    background: #2563eb;
+}
+
+.timeline-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s;
+}
+
+.timeline-slider::-moz-range-thumb:hover {
+    background: #2563eb;
+}
+
+.playback-time {
+    text-align: center;
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.playback-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.play-btn, .stop-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.play-btn {
+    background: #10b981;
+    color: white;
+}
+
+.play-btn:hover {
+    background: #059669;
+}
+
+.stop-btn {
+    background: #ef4444;
+    color: white;
+}
+
+.stop-btn:hover {
+    background: #dc2626;
+}
+
+.playback-speed {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.playback-speed label {
+    font-weight: 600;
+    color: #374151;
+}
+
+.playback-speed select {
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    background: white;
+}

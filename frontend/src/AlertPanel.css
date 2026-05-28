@@ -1,0 +1,88 @@
+.alert-panel {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.alert-item {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #ef4444;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.alert-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.alert-content {
+    flex: 1;
+}
+
+.alert-message {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.alert-time {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.alert-close {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    flex-shrink: 0;
+    transition: color 0.2s;
+}
+
+.alert-close:hover {
+    color: #6b7280;
+}
+
+/* Scrollbar styling */
+.alert-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.alert-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.alert-panel::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.alert-panel::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}

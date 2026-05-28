@@ -1,0 +1,66 @@
+.stats-panel {
+    padding: 1rem;
+    border-bottom: 1px solid #0f3460;
+}
+
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.stat-card {
+    background: #181f2e;
+    color: #fff;
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #e94560;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: #e5e7eb;
+    margin-top: 0.25rem;
+}
+
+.alerts-section h4 {
+    color: #e94560;
+    margin-bottom: 0.5rem;
+}
+
+.alerts-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.alert-item {
+    background: rgba(233, 69, 96, 0.1);
+    border-left: 3px solid #e94560;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    color: #1f2937;
+}
+
+.alert-time {
+    color: #666;
+    font-size: 0.65rem;
+}
+
+.alert-message {
+    margin-top: 0.25rem;
+}
+
+.no-alerts {
+    color: #666;
+    text-align: center;
+    padding: 1rem;
+}

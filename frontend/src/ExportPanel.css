@@ -1,0 +1,82 @@
+.export-panel {
+    background: white;
+    border: 2px solid #8b5cf6;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 10px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.export-panel h3 {
+    margin: 0 0 12px 0;
+    color: #1f2937;
+    font-size: 16px;
+}
+
+.export-device {
+    background: #f3f4f6;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #374151;
+}
+
+.export-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.export-options label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #374151;
+    user-select: none;
+}
+
+.export-options input[type="radio"] {
+    cursor: pointer;
+    accent-color: #8b5cf6;
+}
+
+.export-btn {
+    width: 100%;
+    padding: 12px;
+    background: #8b5cf6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.export-btn:hover:not(:disabled) {
+    background: #7c3aed;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(139, 92, 246, 0.3);
+}
+
+.export-btn:disabled {
+    background: #9ca3af;
+    color: #f9fafb;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.export-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f0f9ff;
+    border-left: 3px solid #0ea5e9;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #0369a1;
+}
