@@ -1,0 +1,217 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import MapComponent from '../MapComponent';
+import { getTrackingSocket } from '../socketService';
+import { apiGet, apiPost } from '../api';
+import CaseTimeline from './CaseTimeline';
+import LinkGenerator from './LinkGenerator';
+import './CommandDesk.css';
+
+function CommandDesk({ wallMode = false, onCaseSelect }) {
+    const [cases, setCases] = useState([]);
+    const [selected, setSelected] = useState(null);
+    const [events, setEvents] = useState([]);
+    const [devices, setDevices] = useState([]);
+    const [noteText, setNoteText] = useState('');
+    const [operatorId, setOperatorId] = useState(
+        () => localStorage.getItem('operator_id') || 'operator_1'
+    );
+
+    const loadCases = useCallback(async () => {
+        try {
+            const data = await apiGet('/api/cases?status=active', { admin: true });
+            setCases(data.cases || []);
+        } catch (e) {
+            console.error(e);
+        }
+    }, []);
+
+    const loadEvents = useCallback(async (caseId) => {
+        if (!caseId) return;
+        try {
+            const data = await apiGet(`/api/cases/${caseId}/events?limit=50`, { admin: true });
+            setEvents(data.events || []);
+        } catch (e) {
+            console.error(e);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadCases();
+        const interval = setInterval(loadCases, 15000);
+        return () => clearInterval(interval);
+    }, [loadCases]);
+
+    useEffect(() => {
+        const socket = getTrackingSocket();
+        socket.emit('case_subscribe', { all_active: true });
+
+        const onLocation = (data) => {
+            setDevices((prev) => {
+                const patch = {
+                    device_id: data.device_id,
+                    lat: data.latitude,
+                    lon: data.longitude,
+                    speed: data.speed,
+                    is_moving: data.is_moving,
+                    device_name: data.device_name,
+                    case_id: data.case_id,
+                    lastUpdate: data.timestamp,
+                    accuracy: data.accuracy,
+                    location_quality: data.location_quality
+                };
+                const idx = prev.findIndex((d) => d.device_id === data.device_id);
+                if (idx >= 0) {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx], ...patch };
+                    return next;
+                }
+                return [...prev, patch];
+            });
+        };
+
+        const onCaseEvent = (ev) => {
+            setEvents((prev) => [ev, ...prev].slice(0, 80));
+            if (selected?.case_id === ev.case_id) loadEvents(ev.case_id);
+        };
+
+        socket.on('location_update', onLocation);
+        socket.on('case_event', onCaseEvent);
+
+        apiGet('/api/devices')
+            .then((list) => {
+                const mapped = (list || []).map((d) => ({
+                    device_id: d.device_id,
+                    lat: d.lat,
+                    lon: d.lon,
+                    speed: d.speed,
+                    device_name: d.device_name,
+                    case_id: d.case_id,
+                    lastUpdate: d.lastUpdate,
+                    accuracy: d.accuracy,
+                    location_quality: d.location_quality
+                }));
+                setDevices(mapped);
+            })
+            .catch(() => {});
+
+        return () => {
+            socket.off('location_update', onLocation);
+            socket.off('case_event', onCaseEvent);
+        };
+    }, [selected, loadEvents]);
+
+    useEffect(() => {
+        if (selected) loadEvents(selected.case_id);
+    }, [selected, loadEvents]);
+
+    const selectCase = (c) => {
+        setSelected(c);
+        onCaseSelect?.(c);
+        const dev = devices.find((d) => d.device_id === c.device_id);
+        if (dev) setSelected({ ...c, ...dev });
+    };
+
+    const addNote = async () => {
+        if (!selected || !noteText.trim()) return;
+        await apiPost(
+            `/api/cases/${selected.case_id}/notes`,
+            { author: operatorId, text: noteText },
+            { admin: true }
+        );
+        setNoteText('');
+        loadEvents(selected.case_id);
+    };
+
+    const handoff = async () => {
+        if (!selected) return;
+        const next = prompt('Yeni operator ID:', 'operator_2');
+        if (!next) return;
+        await apiPost(`/api/cases/${selected.case_id}/handoff`, { operator_id: next }, { admin: true });
+        localStorage.setItem('operator_id', next);
+        setOperatorId(next);
+        loadCases();
+    };
+
+    const caseDevices = selected
+        ? devices.filter((d) => d.case_id === selected.case_id || d.device_id === selected.device_id)
+        : devices;
+
+    return (
+        <div className={`command-desk${wallMode ? ' command-desk--wall' : ''}`}>
+            <aside className="command-desk__sidebar">
+                <LinkGenerator onCaseCreated={(c) => { loadCases(); setSelected(c); }} />
+                <div className="command-desk__operator">
+                    <label>
+                        Operator ID
+                        <input
+                            value={operatorId}
+                            onChange={(e) => {
+                                setOperatorId(e.target.value);
+                                localStorage.setItem('operator_id', e.target.value);
+                            }}
+                        />
+                    </label>
+                </div>
+                <h3>Aktiv tapşırıqlar ({cases.length})</h3>
+                <ul className="command-desk__cases">
+                    {cases.map((c) => (
+                        <li key={c.case_id}>
+                            <button
+                                type="button"
+                                className={selected?.case_id === c.case_id ? 'is-active' : ''}
+                                onClick={() => selectCase(c)}
+                            >
+                                <strong>{c.title}</strong>
+                                <span className={`priority priority--${c.priority}`}>{c.priority}</span>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </aside>
+
+            <main className="command-desk__map">
+                <MapComponent
+                    devices={caseDevices}
+                    selectedDevice={caseDevices[0] || null}
+                    userLocation={null}
+                    currentDeviceId={null}
+                />
+            </main>
+
+            <aside className="command-desk__detail">
+                {selected ? (
+                    <>
+                        <h2>{selected.title}</h2>
+                        <p className="command-desk__meta">Cihaz: {selected.device_id}</p>
+                        {selected.lat != null && (
+                            <p className="command-desk__meta">
+                                {selected.lat?.toFixed(5)}, {selected.lon?.toFixed(5)}
+                                {selected.accuracy != null && ` ±${Math.round(selected.accuracy)}m`}
+                            </p>
+                        )}
+                        <button type="button" className="command-desk__handoff" onClick={handoff}>
+                            Təhvil ver (handoff)
+                        </button>
+                        <div className="command-desk__notes">
+                            <textarea
+                                value={noteText}
+                                onChange={(e) => setNoteText(e.target.value)}
+                                placeholder="Operator qeydi..."
+                                rows={2}
+                            />
+                            <button type="button" onClick={addNote}>
+                                Qeyd əlavə et
+                            </button>
+                        </div>
+                        <h3>Hadisə xətti</h3>
+                        <CaseTimeline events={events} />
+                    </>
+                ) : (
+                    <p>Tapşırıq seçin</p>
+                )}
+            </aside>
+        </div>
+    );
+}
+
+export default CommandDesk;

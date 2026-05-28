@@ -42,11 +42,14 @@ export function useLocationTracker({
     enabled,
     deviceInfo,
     testMode,
+    subjectToken,
+    consentText,
     onConnectionChange,
     onDeviceRegistered,
     onUserLocation,
     onDevicesChange,
-    onLocationRefining
+    onLocationRefining,
+    onCaseRegistered
 }) {
     const socketRef = useRef(null);
     const geoWatchRef = useRef(null);
@@ -58,6 +61,10 @@ export function useLocationTracker({
         lastLon: null
     });
     const userDeviceIdRef = useRef(null);
+    const subjectTokenRef = useRef(subjectToken);
+    const consentTextRef = useRef(consentText);
+    subjectTokenRef.current = subjectToken;
+    consentTextRef.current = consentText;
     const batteryRef = useRef({ level: 100, charging: false });
     const handleGeoPositionRef = useRef(null);
     const refreshLocationRef = useRef(() => {});
@@ -234,12 +241,31 @@ export function useLocationTracker({
             }, 3000);
         };
 
-        const onConnect = () => {
-            userDeviceIdRef.current = 'user_' + socket.id;
+        const beginTracking = () => {
+            if (!userDeviceIdRef.current) {
+                userDeviceIdRef.current = 'user_' + socket.id;
+            }
             callbacksRef.current.onConnectionChange?.(true);
             callbacksRef.current.onDeviceRegistered?.(userDeviceIdRef.current);
             getBatteryStatus();
             startGeolocation();
+        };
+
+        const onSubjectRegistered = (data) => {
+            userDeviceIdRef.current = data.device_id;
+            callbacksRef.current.onCaseRegistered?.(data);
+            beginTracking();
+        };
+
+        const onConnect = () => {
+            if (subjectTokenRef.current) {
+                socket.emit('register_subject', {
+                    subject_token: subjectTokenRef.current,
+                    consent_text: consentTextRef.current
+                });
+                return;
+            }
+            beginTracking();
         };
 
         const onDisconnect = () => {
@@ -325,6 +351,7 @@ export function useLocationTracker({
         socket.on('active_devices', onActiveDevices);
         socket.on('location_update', onLocationUpdate);
         socket.on('device_disconnected', onDeviceDisconnected);
+        socket.on('subject_registered', onSubjectRegistered);
 
         if (socket.connected) {
             onConnect();
@@ -337,6 +364,7 @@ export function useLocationTracker({
             socket.off('active_devices', onActiveDevices);
             socket.off('location_update', onLocationUpdate);
             socket.off('device_disconnected', onDeviceDisconnected);
+            socket.off('subject_registered', onSubjectRegistered);
 
             if (geoWatchRef.current != null) {
                 navigator.geolocation.clearWatch(geoWatchRef.current);
@@ -354,7 +382,9 @@ export function useLocationTracker({
         deviceInfo?.device_name,
         deviceInfo?.browser,
         deviceInfo?.device_type,
-        deviceInfo?.user_agent
+        deviceInfo?.user_agent,
+        subjectToken,
+        consentText
     ]);
 
     return {

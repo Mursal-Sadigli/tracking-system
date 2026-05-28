@@ -1,6 +1,7 @@
 node_modules/
 frontend/node_modules/
 backend/node_modules/
+backend/data/store.json
 python-service/venv/
 .env
 frontend/.env

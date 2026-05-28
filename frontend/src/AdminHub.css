@@ -1,0 +1,30 @@
+.admin-hub__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+}
+
+.admin-hub__tabs button,
+.admin-hub__wall-link {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    background: #334155;
+    color: #e2e8f0;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.admin-hub__tabs button.is-active {
+    background: #2563eb;
+    color: #fff;
+}
+
+.admin-hub__wall-link {
+    margin-left: auto;
+    background: #0f766e;
+}

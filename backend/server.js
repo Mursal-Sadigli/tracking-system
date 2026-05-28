@@ -6,7 +6,12 @@ const { spawn, spawnSync } = require('child_process');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const axios = require('axios');
-const { pool, initDB } = require('./db');
+const { pool, initDB, runRetention } = require('./db');
+const { requireAdminKey } = require('./auth');
+const { createApiRouter } = require('./routes');
+const { attachSocketHandlers } = require('./socketHandlers');
+const { runAnalyticsBatch } = require('./pythonClient');
+const { getConsentLogs } = require('./compliance');
 
 const PYTHON_LOCATION_API = process.env.PYTHON_LOCATION_API || 'http://127.0.0.1:5001';
 const PYTHON_SERVICE_DIR = path.join(__dirname, '..', 'python-service');
@@ -79,7 +84,22 @@ app.use(
         methods: ['GET', 'POST', 'OPTIONS']
     })
 );
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
+
+try {
+    const rateLimit = require('express-rate-limit');
+    app.use(
+        '/api/',
+        rateLimit({
+            windowMs: 60 * 1000,
+            max: Number(process.env.RATE_LIMIT_MAX) || 300,
+            standardHeaders: true,
+            legacyHeaders: false
+        })
+    );
+} catch {
+    console.warn('express-rate-limit not installed — skip rate limit');
+}
 
 function healthHandler(req, res) {
     res.json({
@@ -324,27 +344,8 @@ function updateVehicle(vehicle, roads) {
     vehicle.speed = Math.max(5, Math.min(40, vehicle.speed));
 }
 
-function runPythonAnalytics(history = []) {
-    try {
-        const result = spawnSync('python', [
-            path.join(__dirname, '..', 'python-service', 'analytics_engine.py'),
-            '--history', JSON.stringify(history)
-        ], { encoding: 'utf8' });
-
-        if (result.status === 0 && result.stdout.trim()) {
-            return JSON.parse(result.stdout.trim());
-        }
-    } catch (error) {
-        console.error('Python analytics error:', error.message);
-    }
-
-    return {
-        score: 0,
-        route_profile: { short: 'Python analytics unavailable', safe: 'Python analytics unavailable', efficient: 'Python analytics unavailable' },
-        anomalies: [],
-        heatmap: [],
-        risk_level: 'unknown'
-    };
+async function runPythonAnalytics(history = []) {
+    return runAnalyticsBatch(history);
 }
 
 function computeRouteRecommendation(history = []) {
@@ -382,11 +383,44 @@ app.get('/api/devices', (req, res) => {
     res.json(devices);
 });
 
-// Get device history
-app.get('/api/devices/:deviceId/history', (req, res) => {
+// Get device history (memory + optional DB)
+app.get('/api/devices/:deviceId/history', async (req, res) => {
     const { deviceId } = req.params;
-    const history = deviceHistory.get(deviceId) || [];
+    let history = deviceHistory.get(deviceId) || [];
+
+    if (req.query.from || req.query.to) {
+        const from = req.query.from ? new Date(req.query.from).getTime() : 0;
+        const to = req.query.to ? new Date(req.query.to).getTime() : Date.now();
+        history = history.filter((p) => {
+            const t = new Date(p.timestamp).getTime();
+            return t >= from && t <= to;
+        });
+    }
+
+    if (history.length === 0 && req.query.db === '1') {
+        try {
+            const [rows] = await pool.execute(
+                `SELECT latitude as lat, longitude as lon, speed, heading, is_moving, battery_level, accuracy, timestamp
+                 FROM gps_tracks WHERE device_id = ? ORDER BY timestamp DESC LIMIT 500`,
+                [deviceId]
+            );
+            history = rows.reverse();
+        } catch {
+            // ignore
+        }
+    }
+
     res.json(history);
+});
+
+app.get('/api/compliance/consent/:caseId', requireAdminKey, (req, res) => {
+    res.json({ logs: getConsentLogs(req.params.caseId) });
+});
+
+app.post('/api/admin/retention-run', requireAdminKey, async (req, res) => {
+    const days = Number(req.body?.days) || Number(process.env.DATA_RETENTION_DAYS) || 30;
+    const result = await runRetention(days);
+    res.json({ ok: true, ...result, retention_days: days });
 });
 
 app.get('/api/fleet/summary', (req, res) => {
@@ -433,9 +467,9 @@ app.get('/api/analytics/anomalies', (req, res) => {
     res.json({ anomalies, count: anomalies.length });
 });
 
-app.get('/api/analytics/score/:deviceId', (req, res) => {
+app.get('/api/analytics/score/:deviceId', async (req, res) => {
     const history = deviceHistory.get(req.params.deviceId) || [];
-    const score = runPythonAnalytics(history);
+    const score = await runPythonAnalytics(history);
 
     res.json({
         deviceId: req.params.deviceId,
@@ -446,18 +480,17 @@ app.get('/api/analytics/score/:deviceId', (req, res) => {
 });
 
 app.get('/api/analytics/risk-zones', (req, res) => {
-    const history = Array.from(deviceHistory.values()).flat();
-    const zones = history
-        .filter(point => (point.speed || 0) > 12 || (point.battery_level || 100) < 25)
-        .slice(0, 12)
-        .map((point, index) => ({
-            id: index + 1,
-            lat: point.lat,
-            lon: point.lon,
-            severity: (point.speed || 0) > 18 ? 'high' : 'medium',
-            label: (point.speed || 0) > 18 ? 'Riskli trafik zonası' : 'Aşağı batareya zonası',
-            weight: Math.max(1, Math.round(((point.speed || 0) * 3.6) / 10))
-        }));
+    const { buildHeatmapFromHistories } = require('./intel');
+    const histories = Array.from(deviceHistory.values());
+    const heat = buildHeatmapFromHistories(histories);
+    const zones = heat.map((point, index) => ({
+        id: index + 1,
+        lat: point.lat,
+        lon: point.lon,
+        severity: point.weight >= 4 ? 'high' : 'medium',
+        label: 'İsti zona (real data)',
+        weight: point.weight
+    }));
 
     res.json({ zones, count: zones.length });
 });
@@ -585,120 +618,17 @@ app.post('/api/city/vehicles/:cityName/stop', (req, res) => {
         res.status(404).json({ error: 'Simulation not running' });
     }
 });
+app.use(
+    '/api',
+    createApiRouter({
+        activeDevices,
+        deviceHistory,
+        requireAdminKey
+    })
+);
+
 // ============ WEBSOCKET (Real-time) ============
-
-io.on('connection', (socket) => {
-    console.log('🔌 Client connected:', socket.id);
-    
-    // Send current active devices to new client
-    socket.emit('active_devices', Array.from(activeDevices.entries()).map(([id, data]) => ({
-        device_id: id,
-        ...data
-    })));
-    
-    socket.on('user_location_update', async (data) => {
-        const {
-            device_id,
-            latitude,
-            longitude,
-            speed,
-            accuracy,
-            heading,
-            battery_level,
-            device_name,
-            device_type,
-            user_agent,
-            browser,
-            location_quality,
-            address
-        } = data;
-
-        const timestamp = new Date();
-        const isMoving = (speed || 0) > 0.3;
-
-        activeDevices.set(device_id, {
-            lat: latitude,
-            lon: longitude,
-            speed: speed || 0,
-            heading: heading || 0,
-            is_moving: isMoving,
-            lastUpdate: timestamp,
-            accuracy: accuracy ?? null,
-            location_quality: location_quality || 'unknown',
-            battery_level: battery_level || 100,
-            device_name: device_name || 'Unknown Device',
-            device_type: device_type || 'Unknown',
-            user_agent: user_agent || '',
-            browser: browser || 'Unknown',
-            address: address || ''
-        });
-
-        const history = deviceHistory.get(device_id) || [];
-        history.push({
-            lat: latitude,
-            lon: longitude,
-            speed,
-            heading: heading || 0,
-            timestamp,
-            is_moving: isMoving,
-            battery_level: battery_level || 100
-        });
-        if (history.length > 100) history.shift();
-        deviceHistory.set(device_id, history);
-
-        pool.query(
-            `INSERT INTO gps_tracks (device_id, latitude, longitude, speed, heading, is_moving, battery_level, timestamp, device_name, device_type, browser, user_agent)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                device_id,
-                latitude,
-                longitude,
-                speed || 0,
-                heading || 0,
-                isMoving,
-                battery_level || 100,
-                timestamp,
-                device_name || 'Unknown Device',
-                device_type || 'Unknown',
-                browser || 'Unknown',
-                user_agent || ''
-            ]
-        ).catch(() => {});
-
-        io.emit('location_update', {
-            device_id,
-            latitude,
-            longitude,
-            speed: speed || 0,
-            heading: heading || 0,
-            is_moving: isMoving,
-            battery_level: battery_level || 100,
-            accuracy: accuracy ?? null,
-            location_quality: location_quality || 'unknown',
-            timestamp: timestamp.toISOString(),
-            device_name: device_name || 'Unknown Device',
-            device_type: device_type || 'Unknown',
-            browser: browser || 'Unknown',
-            address: address || ''
-        });
-    });
-    
-    socket.on('disconnect', () => {
-        console.log('🔌 Client disconnected:', socket.id);
-        const deviceIdToRemove = 'user_' + socket.id;
-        if (activeDevices.has(deviceIdToRemove)) {
-            activeDevices.delete(deviceIdToRemove);
-            deviceHistory.delete(deviceIdToRemove);
-            io.emit('device_disconnected', { device_id: deviceIdToRemove });
-        }
-    });
-    
-    // Client can request specific device history
-    socket.on('get_history', (device_id) => {
-        const history = deviceHistory.get(device_id) || [];
-        socket.emit('history_data', { device_id, history });
-    });
-});
+attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh });
 
 // Start server
 const PORT = process.env.PORT || 3500;
@@ -712,4 +642,11 @@ server.listen(PORT, () => {
     } else {
         console.log('🐍 Remote Python API — local spawn skipped (Render/cloud)');
     }
+
+    const retentionDays = Number(process.env.DATA_RETENTION_DAYS) || 30;
+    setInterval(() => {
+        runRetention(retentionDays).then((r) => {
+            if (r.deleted > 0) console.log(`🗑️ Retention: ${r.deleted} köhnə track silindi`);
+        });
+    }, 24 * 60 * 60 * 1000);
 });

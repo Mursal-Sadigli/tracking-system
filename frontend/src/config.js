@@ -1,6 +1,5 @@
 /**
  * Backend API və Socket.IO (yerli: 3500 port).
- * Telefondan: frontend/.env → REACT_APP_API_URL=http://KOMPUTER_IP:3500
  */
 const DEFAULT_BACKEND = 'http://localhost:3500';
 
@@ -9,14 +8,16 @@ export const API_BASE_URL = (process.env.REACT_APP_API_URL || DEFAULT_BACKEND).r
     ''
 );
 
-/** Socket.IO eyni hostda işləyir */
 export const SOCKET_URL = API_BASE_URL;
 
-/** Operator paneli yolu (gizli) */
 export const ADMIN_PATH =
     (process.env.REACT_APP_ADMIN_PATH || '/admin').replace(/\/$/, '') || '/admin';
 
-/** Subyekt səhifəsi mətnləri (görünən UI) */
+export const COMMAND_PATH =
+    (process.env.REACT_APP_COMMAND_PATH || '/command').replace(/\/$/, '') || '/command';
+
+export const ADMIN_API_KEY = process.env.REACT_APP_ADMIN_KEY || '';
+
 export const SUBJECT_TITLE =
     process.env.REACT_APP_SUBJECT_TITLE || 'Sorğu doğrulaması';
 
@@ -29,3 +30,6 @@ export const SUBJECT_SUCCESS_MESSAGE =
     'Təsdiqləndi. Sorğunuz qəbul olundu — bu pəncərəni bağlaya bilərsiniz.';
 
 export const SUBJECT_GRANTED_KEY = 'subject_locationGranted';
+
+export const CONSENT_TEXT =
+    process.env.REACT_APP_CONSENT_TEXT || `${SUBJECT_TITLE}. ${SUBJECT_MESSAGE}`;

@@ -1,0 +1,23 @@
+.wall-mode {
+    min-height: 100vh;
+    background: #020617;
+}
+
+.wall-mode__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+.wall-mode__header h1 {
+    font-size: 1.75rem;
+    margin: 0;
+}
+
+.wall-mode__clock {
+    font-size: 1.25rem;
+    font-variant-numeric: tabular-nums;
+}

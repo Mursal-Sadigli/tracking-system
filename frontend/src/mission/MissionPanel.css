@@ -1,0 +1,50 @@
+.mission-panel {
+    padding: 1rem;
+    color: #e2e8f0;
+}
+
+.mission-panel section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #1e293b;
+    border-radius: 8px;
+}
+
+.mission-panel button {
+    margin-right: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.9rem;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.deviation-gauge__bar {
+    height: 8px;
+    background: #334155;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.deviation-gauge__fill {
+    height: 100%;
+    background: #22c55e;
+    transition: width 0.3s;
+}
+
+.deviation-gauge.warn .deviation-gauge__fill {
+    background: #ef4444;
+}
+
+.mission-panel__briefing {
+    margin-top: 0.75rem;
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+.mission-panel__hint {
+    padding: 2rem;
+    color: #94a3b8;
+}

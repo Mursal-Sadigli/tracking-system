@@ -43,12 +43,49 @@ def compute_route_profile(history: List[Dict]) -> Dict:
 
 def detect_anomalies(history: List[Dict]) -> List[Dict]:
     anomalies = []
-    for point in history[-20:]:
+    recent = history[-30:]
+    for i, point in enumerate(recent):
         speed_kmh = point.get('speed', 0) * 3.6
         if speed_kmh > 50:
-            anomalies.append({"type": "speed", "value": round(speed_kmh, 1), "lat": point['lat'], "lon": point['lon']})
+            anomalies.append({
+                "type": "speed",
+                "value": round(speed_kmh, 1),
+                "lat": point['lat'],
+                "lon": point['lon'],
+                "severity": "high" if speed_kmh > 80 else "medium",
+                "explanation_az": f"Sürət limiti aşılıb: {speed_kmh:.0f} km/saat",
+            })
         if (point.get('battery_level', 100) or 100) < 20:
-            anomalies.append({"type": "battery", "value": point.get('battery_level', 100), "lat": point['lat'], "lon": point['lon']})
+            anomalies.append({
+                "type": "battery",
+                "value": point.get('battery_level', 100),
+                "lat": point['lat'],
+                "lon": point['lon'],
+                "severity": "medium",
+                "explanation_az": "Aşağı batareya",
+            })
+        acc = point.get('accuracy')
+        if acc is not None and acc > 200:
+            anomalies.append({
+                "type": "accuracy",
+                "value": acc,
+                "lat": point['lat'],
+                "lon": point['lon'],
+                "severity": "low",
+                "explanation_az": "Zəif GPS dəqiqliyi",
+            })
+        if i > 0:
+            prev = recent[i - 1]
+            dist = haversine_meters(prev['lat'], prev['lon'], point['lat'], point['lon'])
+            if dist > 5000:
+                anomalies.append({
+                    "type": "teleport",
+                    "value": round(dist / 1000, 1),
+                    "lat": point['lat'],
+                    "lon": point['lon'],
+                    "severity": "high",
+                    "explanation_az": "GPS sıçrayışı (teleport) aşkarlandı",
+                })
     return anomalies
 
 

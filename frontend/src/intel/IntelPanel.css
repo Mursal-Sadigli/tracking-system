@@ -1,0 +1,22 @@
+.intel-panel {
+    padding: 1rem;
+    color: #e2e8f0;
+}
+
+.intel-panel section {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #1e293b;
+    border-radius: 8px;
+}
+
+.intel-panel ul {
+    margin: 0.5rem 0;
+    padding-left: 1.2rem;
+    font-size: 0.9rem;
+}
+
+.intel-panel__hint {
+    padding: 2rem;
+    color: #94a3b8;
+}

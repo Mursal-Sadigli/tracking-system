@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Dashboard from './Dashboard';
+import AdminHub from './AdminHub';
 import { apiGet } from './api';
+import { ADMIN_API_KEY } from './config';
 import { GPS_OPTIONS, clearLastKnownLocation, saveLastKnownLocation } from './geolocation';
 import './App.css';
 
@@ -10,7 +11,9 @@ function AdminPage() {
     const [permissionDenied, setPermissionDenied] = useState(false);
     const [awaitingFreshGps, setAwaitingFreshGps] = useState(false);
     const [backendOk, setBackendOk] = useState(null);
-    const testMode = new URLSearchParams(window.location.search).get('test') === 'true';
+    const searchParams = new URLSearchParams(window.location.search);
+    const testMode = searchParams.get('test') === 'true';
+    const keyOk = !ADMIN_API_KEY || searchParams.get('key') === ADMIN_API_KEY;
 
     const applyPermissionSuccess = (position) => {
         const { latitude, longitude, accuracy } = position.coords;
@@ -77,6 +80,17 @@ function AdminPage() {
 
     const showDashboard = locationEnabled || awaitingFreshGps;
 
+    if (!keyOk) {
+        return (
+            <div className="permission-container">
+                <div className="permission-dialog">
+                    <h2>Operator girişi</h2>
+                    <p>URL-ə admin açarı əlavə edin: ?key=...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="App">
             <header className="app-header">
@@ -102,7 +116,7 @@ function AdminPage() {
             </header>
 
             {showDashboard ? (
-                <Dashboard onConnectionChange={setConnected} />
+                <AdminHub onConnectionChange={setConnected} />
             ) : (
                 <div className="permission-container">
                     <div className="permission-dialog">
