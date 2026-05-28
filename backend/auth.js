@@ -5,9 +5,12 @@ function verifyAdminCredentials({ pin, password } = {}) {
     if (!ADMIN_API_KEY && !ADMIN_PIN) return true;
     const p = pin != null ? String(pin).trim() : '';
     const pass = password != null ? String(password).trim() : '';
-    if (ADMIN_PIN && p && p === ADMIN_PIN) return true;
+    if (ADMIN_PIN) {
+        if (/^\d{6}$/.test(p) && p === ADMIN_PIN) return true;
+        return false;
+    }
     if (pass && pass === ADMIN_API_KEY) return true;
-    if (p && p === ADMIN_API_KEY) return true;
+    if (/^\d{6}$/.test(p) && p === ADMIN_API_KEY) return true;
     return false;
 }
 

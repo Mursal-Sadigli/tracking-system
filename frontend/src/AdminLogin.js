@@ -1,33 +1,31 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { apiPost } from './api';
-import { setOperatorSession } from './auth/adminAuth';
-import { ADMIN_PATH } from './config';
 import './AdminLogin.css';
 
-function AdminLogin() {
-    const navigate = useNavigate();
-    const [value, setValue] = useState('');
+function AdminLogin({ onSuccess }) {
+    const [pin, setPin] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const handlePinChange = (ev) => {
+        const digits = ev.target.value.replace(/\D/g, '').slice(0, 6);
+        setPin(digits);
+        setError('');
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (pin.length !== 6) {
+            setError('6 rəqəmli PIN daxil edin');
+            return;
+        }
         setError('');
         setLoading(true);
         try {
-            const trimmed = value.trim();
-            const body =
-                trimmed.length <= 8
-                    ? { pin: trimmed }
-                    : { password: trimmed };
-            await apiPost('/api/admin/login', body);
-            setOperatorSession();
-            navigate(ADMIN_PATH.startsWith('/') ? ADMIN_PATH : `/${ADMIN_PATH}`, {
-                replace: true
-            });
+            await apiPost('/api/admin/login', { pin });
+            onSuccess();
         } catch {
-            setError('Parol və ya PIN səhvdir');
+            setError('PIN səhvdir');
         } finally {
             setLoading(false);
         }
@@ -37,23 +35,22 @@ function AdminLogin() {
         <div className="admin-login">
             <form className="admin-login__card" onSubmit={handleSubmit}>
                 <h1>Operator girişi</h1>
-                <p className="admin-login__hint">
-                    Qısa PIN və ya parol daxil edin. Bir dəfə daxil olduqdan sonra bu brauzerdə
-                    yenidən yazmaq lazım olmayacaq.
-                </p>
+                <p className="admin-login__hint">Hər dəfə 6 rəqəmli PIN daxil edin.</p>
                 <label className="admin-login__label">
-                    PIN / parol
+                    PIN
                     <input
                         type="password"
-                        autoComplete="current-password"
-                        value={value}
-                        onChange={(ev) => setValue(ev.target.value)}
-                        placeholder="məs. 6 rəqəmli PIN"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        maxLength={6}
+                        value={pin}
+                        onChange={handlePinChange}
+                        placeholder="••••••"
                         autoFocus
                     />
                 </label>
                 {error && <p className="admin-login__error">{error}</p>}
-                <button type="submit" className="admin-login__btn" disabled={loading || !value.trim()}>
+                <button type="submit" className="admin-login__btn" disabled={loading || pin.length !== 6}>
                     {loading ? 'Yoxlanılır...' : 'Daxil ol'}
                 </button>
             </form>
