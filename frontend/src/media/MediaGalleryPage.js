@@ -8,9 +8,11 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
     const [selected, setSelected] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState('');
 
     const loadMedia = useCallback(async () => {
         setLoading(true);
+        setLoadError('');
         try {
             const path = selectedCaseId
                 ? `/api/cases/${selectedCaseId}/media?limit=80`
@@ -19,8 +21,9 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
             const list = data.media || [];
             setItems(list);
             setSelected((prev) => prev || list[0] || null);
-        } catch {
+        } catch (e) {
             setItems([]);
+            setLoadError(e?.message || 'Media yüklənmədi — PIN ilə daxil oldunuzmu?');
         } finally {
             setLoading(false);
         }
@@ -81,8 +84,12 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
             <aside className="media-gallery__list">
                 <h2>Subyekt media</h2>
                 {loading && <p className="media-gallery__hint">Yüklənir...</p>}
-                {!loading && filtered.length === 0 && (
-                    <p className="media-gallery__hint">Hələ media yoxdur</p>
+                {loadError && <p className="media-gallery__error">{loadError}</p>}
+                {!loading && !loadError && filtered.length === 0 && (
+                    <p className="media-gallery__hint">
+                        Hələ media yoxdur. Subyektə <strong>/s/…</strong> linkini göndərin, «Davam
+                        et» basılsın — foto/video burada görünəcək.
+                    </p>
                 )}
                 <ul>
                     {filtered.map((item) => (

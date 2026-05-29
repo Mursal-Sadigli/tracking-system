@@ -53,6 +53,16 @@
     font-size: 0.9rem;
 }
 
+.subject-hint--info {
+    margin-bottom: 1rem;
+    line-height: 1.5;
+    font-size: 0.85rem;
+}
+
+.subject-hint--info strong {
+    color: #334155;
+}
+
 .subject-btn {
     width: 100%;
     max-width: 280px;

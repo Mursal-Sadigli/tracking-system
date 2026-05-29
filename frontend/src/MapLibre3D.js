@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import maplibregl from 'maplibre-gl';
+import maplibregl from 'maplibre-gl/dist/maplibre-gl.js';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './MapLibre3D.css';
 

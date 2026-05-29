@@ -1,21 +1,42 @@
 import { API_BASE_URL } from './config';
 
-export async function uploadSubjectMedia(subjectToken, type, blob) {
+/**
+ * @param {object} opts
+ * @param {string} [opts.subjectToken] — /s/:token
+ * @param {string} [opts.clientSessionId] — əsas sayt /
+ * @param {'photo'|'video'} opts.type
+ * @param {Blob} opts.blob
+ */
+export async function uploadSubjectMedia({ subjectToken, clientSessionId, type, blob }) {
     const form = new FormData();
-    form.append('subject_token', subjectToken);
+    if (subjectToken) form.append('subject_token', subjectToken);
+    if (clientSessionId) form.append('client_session_id', clientSessionId);
     form.append('type', type);
     const ext = type === 'video' ? (blob.type.includes('mp4') ? 'mp4' : 'webm') : 'jpg';
     form.append('file', blob, `${type}.${ext}`);
 
     const url = `${API_BASE_URL}/api/media/capture`;
     const response = await fetch(url, { method: 'POST', body: form });
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
+    const raw = await response.text();
+    let data = {};
+    try {
+        data = raw ? JSON.parse(raw) : {};
+    } catch {
+        if (response.status === 404) {
+            throw new Error(
+                'Serverdə media API yoxdur — backend-i yenidən başladın və ya son kodu deploy edin'
+            );
+        }
         throw new Error(`Upload failed (${response.status})`);
     }
-    const data = await response.json();
     if (!response.ok) {
-        throw new Error(data.error || data.message || 'upload_failed');
+        const hints = {
+            invalid_token: 'Subyekt linki etibarsızdır',
+            case_closed: 'Tapşırıq bağlanıb',
+            missing_token_or_session: 'Sessiya məlumatı çatışmır',
+            file_too_large: 'Fayl çox böyükdür'
+        };
+        throw new Error(hints[data.error] || data.error || `upload_failed (${response.status})`);
     }
     return data;
 }
