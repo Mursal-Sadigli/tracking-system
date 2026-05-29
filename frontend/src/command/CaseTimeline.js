@@ -9,6 +9,9 @@ const LABELS = {
     phase_completed: 'Faza tamamlandı',
     subject_offline: 'Offline',
     ai_anomaly: 'AI anomaliya',
+    co_location_meeting: 'Co-location / görüş',
+    briefing_updated: 'Briefing yeniləndi',
+    media_captured: 'Kamera media',
     note: 'Qeyd'
 };
 

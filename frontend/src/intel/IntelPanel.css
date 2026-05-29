@@ -20,3 +20,52 @@
     padding: 2rem;
     color: #94a3b8;
 }
+
+.intel-panel__subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+
+.intel-panel__subtabs button {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid #475569;
+    background: #334155;
+    color: #e2e8f0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.intel-panel__subtabs button.is-active {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+.intel-panel__risk-head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.intel-panel__risk-meta {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.intel-panel__refresh {
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    background: #475569;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.intel-panel__meta {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}

@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from analytics_engine import build_score
 from briefing_generator import generate_briefing
 from geofence_engine import batch_check
-from intel_engine import build_profile
+from intel_engine import build_profile, build_routine_clusters
 from location_resolver import resolve_location
 
 app = FastAPI(title="Tracking Python API", version="2.0.0")
@@ -97,6 +97,11 @@ def post_geofence(body: GeofenceBody):
 @app.post("/intel/profile")
 def post_intel_profile(body: IntelBody):
     return build_profile(body.history)
+
+
+@app.post("/intel/routine-zones")
+def post_routine_zones(body: IntelBody):
+    return build_routine_clusters(body.history)
 
 
 if __name__ == "__main__":

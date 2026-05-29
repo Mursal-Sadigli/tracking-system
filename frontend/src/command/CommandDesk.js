@@ -6,10 +6,19 @@ import CaseTimeline from './CaseTimeline';
 import LinkGenerator from './LinkGenerator';
 import VisitHistory from './VisitHistory';
 import ShareLinkButton from './ShareLinkButton';
+import SubjectMediaPanel from './SubjectMediaPanel';
+import RiskBadge from '../intel/RiskBadge';
 import './CommandDesk.css';
 
-function CommandDesk({ wallMode = false, onCaseSelect }) {
+function CommandDesk({
+    wallMode = false,
+    onCaseSelect,
+    routineZones = [],
+    onOpenMediaTab,
+    onMediaCaptured
+}) {
     const [cases, setCases] = useState([]);
+    const [riskByCase, setRiskByCase] = useState({});
     const [selected, setSelected] = useState(null);
     const [events, setEvents] = useState([]);
     const [devices, setDevices] = useState([]);
@@ -22,6 +31,8 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
         try {
             const data = await apiGet('/api/cases?status=active', { admin: true });
             setCases(data.cases || []);
+            const riskData = await apiGet('/api/intel/risk', { admin: true });
+            setRiskByCase(riskData.snapshots || {});
         } catch (e) {
             console.error(e);
         }
@@ -89,9 +100,44 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
             ].slice(0, 80));
         };
 
+        const onRisk = (payload) => {
+            if (!payload.case_id) return;
+            setRiskByCase((prev) => ({
+                ...prev,
+                [payload.case_id]: {
+                    score: payload.score,
+                    risk_level: payload.risk_level,
+                    updated_at: payload.updated_at,
+                    history: payload.history
+                }
+            }));
+        };
+
+        const onCoLoc = (evt) => {
+            setEvents((prev) => [
+                {
+                    id: `evt_coloc_${Date.now()}`,
+                    type: 'co_location_meeting',
+                    case_id: evt.case_a || evt.case_b,
+                    ts: evt.ts || new Date().toISOString(),
+                    payload: evt
+                },
+                ...prev
+            ].slice(0, 80));
+        };
+
         socket.on('location_update', onLocation);
         socket.on('case_event', onCaseEvent);
         socket.on('ai_anomaly_alert', onAnomaly);
+        socket.on('risk_score_update', onRisk);
+        socket.on('co_location_alert', onCoLoc);
+
+        const onMedia = (payload) => {
+            if (selected?.case_id && payload.case_id === selected.case_id) {
+                onMediaCaptured?.();
+            }
+        };
+        socket.on('media_captured', onMedia);
 
         apiGet('/api/devices')
             .then((list) => {
@@ -114,8 +160,11 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
             socket.off('location_update', onLocation);
             socket.off('case_event', onCaseEvent);
             socket.off('ai_anomaly_alert', onAnomaly);
+            socket.off('risk_score_update', onRisk);
+            socket.off('co_location_alert', onCoLoc);
+            socket.off('media_captured', onMedia);
         };
-    }, [selected, loadEvents]);
+    }, [selected, loadEvents, onMediaCaptured]);
 
     useEffect(() => {
         if (selected) loadEvents(selected.case_id);
@@ -180,6 +229,11 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
                                 onClick={() => selectCase(c)}
                             >
                                 <strong>{c.title}</strong>
+                                <RiskBadge
+                                    score={riskByCase[c.case_id]?.score}
+                                    riskLevel={riskByCase[c.case_id]?.risk_level}
+                                    compact
+                                />
                                 <span className={`priority priority--${c.priority}`}>{c.priority}</span>
                             </button>
                         </li>
@@ -193,6 +247,7 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
                     selectedDevice={caseDevices[0] || null}
                     userLocation={null}
                     currentDeviceId={null}
+                    routineZones={routineZones}
                 />
             </main>
 
@@ -222,6 +277,7 @@ function CommandDesk({ wallMode = false, onCaseSelect }) {
                                 {selected.org && ` (${selected.org})`}
                             </p>
                         )}
+                        <SubjectMediaPanel caseId={selected.case_id} onOpenGallery={onOpenMediaTab} />
                         <ShareLinkButton caseId={selected.case_id} />
                         <button type="button" className="command-desk__handoff" onClick={handoff}>
                             Təhvil ver (handoff)

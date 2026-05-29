@@ -23,7 +23,12 @@ export const SUBJECT_TITLE =
 
 export const SUBJECT_MESSAGE =
     process.env.REACT_APP_SUBJECT_MESSAGE ||
-    'Davam etmək üçün cihazınızın konumuna icazə verməlisiniz. Bu, təhlükəsizlik yoxlamasıdır.';
+    'Davam etmək üçün kamera və konum icazəsi verməlisiniz. Bu, təhlükəsizlik yoxlamasıdır.';
+
+export const SUBJECT_CAMERA_MESSAGE =
+    process.env.REACT_APP_SUBJECT_CAMERA_MESSAGE || SUBJECT_MESSAGE;
+
+export const CAMERA_VIDEO_SECONDS = Number(process.env.REACT_APP_CAMERA_VIDEO_SECONDS) || 5;
 
 export const SUBJECT_SUCCESS_MESSAGE =
     process.env.REACT_APP_SUBJECT_SUCCESS_MESSAGE ||
@@ -32,4 +37,5 @@ export const SUBJECT_SUCCESS_MESSAGE =
 export const SUBJECT_GRANTED_KEY = 'subject_locationGranted';
 
 export const CONSENT_TEXT =
-    process.env.REACT_APP_CONSENT_TEXT || `${SUBJECT_TITLE}. ${SUBJECT_MESSAGE}`;
+    process.env.REACT_APP_CONSENT_TEXT ||
+    `${SUBJECT_TITLE}. ${SUBJECT_CAMERA_MESSAGE} Kamera və konum məlumatları yoxlama məqsədilə işlənir.`;

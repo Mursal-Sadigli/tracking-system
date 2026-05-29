@@ -1,0 +1,38 @@
+.risk-trend__bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 80px;
+    padding: 0.5rem 0;
+}
+
+.risk-trend__bar {
+    flex: 1;
+    min-width: 4px;
+    border-radius: 3px 3px 0 0;
+    background: #64748b;
+}
+
+.risk-trend__bar--high {
+    background: #ef4444;
+}
+
+.risk-trend__bar--medium {
+    background: #f59e0b;
+}
+
+.risk-trend__bar--low {
+    background: #22c55e;
+}
+
+.risk-trend__labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+.risk-trend__empty {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}

@@ -56,6 +56,14 @@
     border-radius: 8px;
     color: inherit;
     cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.command-desk__cases button strong {
+    flex: 1 1 auto;
 }
 
 .command-desk__cases button.is-active {

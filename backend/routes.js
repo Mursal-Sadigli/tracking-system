@@ -2,12 +2,22 @@ const express = require('express');
 const { getCaseEvents } = require('./events');
 const mission = require('./mission');
 const { store } = require('./store');
-const { getCoLocationEvents, buildDwellZones, buildHeatmapFromHistories } = require('./intel');
-const { runAnalyticsBatch, generateBriefing, runIntelProfile } = require('./pythonClient');
+const {
+    getCoLocationEvents,
+    buildDwellZones,
+    buildHeatmapFromHistories,
+    cacheRoutineZones,
+    getRoutineZones
+} = require('./intel');
+const { runAnalyticsBatch, generateBriefing, runIntelProfile, runRoutineZones } = require('./pythonClient');
+const { getRiskSnapshot, getAllRiskSnapshots } = require('./riskService');
+const { getAllRules, setGlobalRules, setCaseRules } = require('./anomalyRules');
+const { getCachedBriefing } = require('./briefingWorker');
 const { pool, DB_ENABLED } = require('./db');
 const visits = require('./visits');
 const shareLinks = require('./shareLinks');
 const cases = require('./cases');
+const media = require('./media');
 
 function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
     const router = express.Router();
@@ -101,6 +111,12 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
         res.json({ phases: mission.getMissionPhases(req.params.caseId) });
     });
 
+    router.get('/cases/:caseId/briefing', admin, (req, res) => {
+        const cached = getCachedBriefing(req.params.caseId);
+        if (cached) return res.json(cached);
+        res.json({ text: null, bullets: [], updated_at: null });
+    });
+
     router.post('/cases/:caseId/briefing', admin, async (req, res) => {
         const caseId = req.params.caseId;
         const c = cases.getCaseById(caseId);
@@ -121,7 +137,59 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
             deviation,
             route: mission.getMissionRoute(caseId)
         });
-        res.json(briefing || { text: 'Briefing hazırlanmadı.', bullets: [] });
+        const out = briefing || { text: 'Briefing hazırlanmadı.', bullets: [] };
+        if (!store.caseBriefings) store.caseBriefings = {};
+        store.caseBriefings[caseId] = {
+            ...out,
+            case_id: caseId,
+            updated_at: new Date().toISOString(),
+            reason: 'manual'
+        };
+        require('./store').persist();
+        res.json(store.caseBriefings[caseId]);
+    });
+
+    router.get('/intel/risk', admin, (req, res) => {
+        res.json({ snapshots: getAllRiskSnapshots() });
+    });
+
+    router.get('/intel/risk/:caseId', admin, (req, res) => {
+        const snap = getRiskSnapshot(req.params.caseId);
+        if (!snap) return res.json({ case_id: req.params.caseId, score: null, history: [] });
+        res.json(snap);
+    });
+
+    router.get('/anomaly-rules', admin, (req, res) => {
+        res.json(getAllRules());
+    });
+
+    router.put('/anomaly-rules', admin, (req, res) => {
+        const { case_id, rules } = req.body;
+        if (case_id) {
+            return res.json({ case_id, rules: setCaseRules(case_id, rules || {}) });
+        }
+        res.json({ global: setGlobalRules(rules || {}) });
+    });
+
+    router.get('/intel/routine-zones/:caseId', admin, async (req, res) => {
+        const caseId = req.params.caseId;
+        const c = cases.getCaseById(caseId);
+        if (!c) return res.status(404).json({ error: 'not_found' });
+        const history = deviceHistory.get(c.device_id) || [];
+        const cached = getRoutineZones(caseId);
+        if (cached && !req.query.refresh) {
+            return res.json(cached);
+        }
+        const result = await runRoutineZones(history);
+        const zones = result?.zones || buildDwellZones(history).map((z, i) => ({
+            ...z,
+            label: z.label,
+            radius_m: 120,
+            type: i === 0 ? 'primary' : 'secondary'
+        }));
+        const payload = { case_id: caseId, zones, updated_at: new Date().toISOString() };
+        cacheRoutineZones(caseId, zones);
+        res.json(payload);
     });
 
     router.get('/intel/profile/:caseId', admin, async (req, res) => {
@@ -174,6 +242,10 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
 
     router.get('/visits', admin, (req, res) => {
         res.json({ visits: visits.listVisits(Number(req.query.limit) || 100) });
+    });
+
+    router.get('/cases/:caseId/media', admin, (req, res) => {
+        res.json({ media: media.listByCase(req.params.caseId, Number(req.query.limit) || 50) });
     });
 
     router.post('/cases/:caseId/share', admin, (req, res) => {

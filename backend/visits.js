@@ -10,6 +10,9 @@ function startVisit(socketId, meta = {}) {
         ended_at: null,
         duration_sec: 0,
         consent_granted: false,
+        camera_granted: false,
+        media_photo: false,
+        media_video: false,
         gps_points: 0,
         case_id: meta.case_id || null,
         subject_token: meta.subject_token || null,
@@ -36,6 +39,24 @@ function markConsent(socketId) {
 function incrementGps(socketId) {
     const v = activeVisits.get(socketId);
     if (v) v.gps_points += 1;
+}
+
+function markMediaByToken(subjectToken, type) {
+    for (const v of activeVisits.values()) {
+        if (v.subject_token === subjectToken) {
+            v.camera_granted = true;
+            if (type === 'photo') v.media_photo = true;
+            if (type === 'video') v.media_video = true;
+        }
+    }
+}
+
+function markMediaPhoto(subjectToken) {
+    markMediaByToken(subjectToken, 'photo');
+}
+
+function markMediaVideo(subjectToken) {
+    markMediaByToken(subjectToken, 'video');
 }
 
 function endVisit(socketId, reason = 'disconnect') {
@@ -68,4 +89,13 @@ function listVisits(limit = 100) {
     return (store.visitHistory || []).slice(-limit).reverse();
 }
 
-module.exports = { startVisit, markConsent, incrementGps, endVisit, listVisits, activeVisits };
+module.exports = {
+    startVisit,
+    markConsent,
+    incrementGps,
+    endVisit,
+    listVisits,
+    activeVisits,
+    markMediaPhoto,
+    markMediaVideo
+};

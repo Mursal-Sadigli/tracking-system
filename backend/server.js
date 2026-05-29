@@ -9,7 +9,12 @@ const axios = require('axios');
 const { pool, initDB, runRetention } = require('./db');
 const { requireAdminKey, handleAdminLogin } = require('./auth');
 const { createApiRouter } = require('./routes');
+const { createMediaRouter } = require('./mediaRoutes');
+const mediaStore = require('./media');
 const { attachSocketHandlers } = require('./socketHandlers');
+const { startBriefingWorker } = require('./briefingWorker');
+const { setCoLocationHandler } = require('./intel');
+const { emitCaseEvent } = require('./events');
 const { runAnalyticsBatch } = require('./pythonClient');
 const { getConsentLogs } = require('./compliance');
 
@@ -628,9 +633,31 @@ app.use(
         requireAdminKey
     })
 );
+app.use('/api/media', createMediaRouter({ io, requireAdminKey }));
 
 // ============ WEBSOCKET (Real-time) ============
-attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh });
+const briefingWorker = startBriefingWorker(io, { activeDevices, deviceHistory });
+
+setCoLocationHandler(async (evt) => {
+    const caseId = evt.case_a || evt.case_b;
+    if (caseId) {
+        await emitCaseEvent(io, {
+            type: 'co_location_meeting',
+            case_id: caseId,
+            device_id: evt.device_a,
+            payload: evt
+        });
+        io.emit('co_location_alert', evt);
+        briefingWorker.triggerBriefing(caseId, 'co_location').catch(() => {});
+    }
+});
+
+attachSocketHandlers(io, {
+    activeDevices,
+    deviceHistory,
+    toKmh,
+    triggerBriefing: briefingWorker.triggerBriefing
+});
 
 // Start server
 const PORT = process.env.PORT || 3500;
@@ -650,5 +677,7 @@ server.listen(PORT, () => {
         runRetention(retentionDays).then((r) => {
             if (r.deleted > 0) console.log(`🗑️ Retention: ${r.deleted} köhnə track silindi`);
         });
+        const mediaDeleted = mediaStore.deleteOlderThan(retentionDays);
+        if (mediaDeleted > 0) console.log(`🗑️ Media retention: ${mediaDeleted} fayl silindi`);
     }, 24 * 60 * 60 * 1000);
 });

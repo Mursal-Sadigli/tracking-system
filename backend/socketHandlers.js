@@ -9,6 +9,8 @@ const { pool, DB_ENABLED } = require('./db');
 const visits = require('./visits');
 const { lookupIp } = require('./ipLookup');
 const { detectAnomalies } = require('./anomalyDetector');
+const { maybeUpdateRisk } = require('./riskService');
+const { getRulesForCase } = require('./anomalyRules');
 
 const geofenceStateByDevice = new Map();
 const missionDwellByCase = new Map();
@@ -21,7 +23,7 @@ function getClientIp(socket) {
     return String(socket.handshake.address || '').replace('::ffff:', '');
 }
 
-function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
+function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, triggerBriefing }) {
     io.on('connection', async (socket) => {
         console.log('🔌 Client connected:', socket.id);
 
@@ -179,8 +181,9 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
             if (history.length > 500) history.shift();
             deviceHistory.set(device_id, history);
 
-            const speedLimit = caseRecord?.speed_limit_kmh || 80;
-            const anomalies = await detectAnomalies(history, speedKmh, speedLimit);
+            const rules = getRulesForCase(caseRecord?.case_id);
+            const speedLimit = caseRecord?.speed_limit_kmh || rules.speed_limit_kmh || 80;
+            const anomalies = await detectAnomalies(history, speedKmh, caseRecord?.case_id);
             if (anomalies.length && caseRecord) {
                 const key = `${device_id}_${anomalies[0].type}`;
                 const last = lastAnomalyEmit.get(key) || 0;
@@ -197,10 +200,14 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                         case_id: caseRecord.case_id,
                         anomalies
                     });
+                    if (triggerBriefing) {
+                        triggerBriefing(caseRecord.case_id, 'anomaly').catch(() => {});
+                    }
                 }
             }
 
             if (caseRecord) {
+                await maybeUpdateRisk(io, caseRecord.case_id, device_id, history);
                 updateSubjectPosition(device_id, latitude, longitude, caseRecord.case_id);
 
                 const gfState = geofenceStateByDevice.get(device_id) || {};
@@ -223,6 +230,9 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh }) {
                         device_id,
                         payload: { geofence: t.name, geofence_id: t.geofence_id }
                     });
+                    if (triggerBriefing) {
+                        triggerBriefing(caseRecord.case_id, 'geofence').catch(() => {});
+                    }
                 }
 
                 const deviation = mission.computeDeviation(latitude, longitude, caseRecord.case_id);

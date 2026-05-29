@@ -58,10 +58,15 @@ async function runIntelProfile(history) {
     return postPython('/intel/profile', { history });
 }
 
+async function runRoutineZones(history) {
+    return postPython('/intel/routine-zones', { history }, 15000);
+}
+
 module.exports = {
     PYTHON_API,
     runAnalyticsBatch,
     generateBriefing,
     checkGeofenceBatch,
-    runIntelProfile
+    runIntelProfile,
+    runRoutineZones
 };

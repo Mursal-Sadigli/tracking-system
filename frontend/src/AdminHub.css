@@ -28,3 +28,16 @@
     margin-left: auto;
     background: #0f766e;
 }
+
+.admin-hub__badge {
+    display: inline-block;
+    margin-left: 0.35rem;
+    min-width: 1.1rem;
+    padding: 0 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: #ef4444;
+    color: #fff;
+    border-radius: 10px;
+    vertical-align: middle;
+}

@@ -1,4 +1,5 @@
 const { runAnalyticsBatch } = require('./pythonClient');
+const { getRulesForCase } = require('./anomalyRules');
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
     const R = 6371000;
@@ -11,7 +12,12 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function detectLocalAnomalies(history, speedKmh, speedLimit = 80) {
+function detectLocalAnomalies(history, speedKmh, rules) {
+    const speedLimit = rules.speed_limit_kmh ?? 80;
+    const teleportDist = rules.teleport_distance_m ?? 3000;
+    const teleportSec = rules.teleport_max_seconds ?? 90;
+    const accuracyMax = rules.accuracy_max_m ?? 250;
+
     const anomalies = [];
     if (speedKmh > speedLimit) {
         anomalies.push({
@@ -27,7 +33,7 @@ function detectLocalAnomalies(history, speedKmh, speedLimit = 80) {
         const b = recent[recent.length - 1];
         const dist = haversineMeters(a.lat, a.lon, b.lat, b.lon);
         const dt = (new Date(b.timestamp) - new Date(a.timestamp)) / 1000;
-        if (dt > 0 && dt < 90 && dist > 3000) {
+        if (dt > 0 && dt < teleportSec && dist > teleportDist) {
             anomalies.push({
                 type: 'teleport',
                 severity: 'high',
@@ -37,7 +43,7 @@ function detectLocalAnomalies(history, speedKmh, speedLimit = 80) {
         }
     }
     const last = history[history.length - 1];
-    if (last?.accuracy != null && last.accuracy > 250) {
+    if (last?.accuracy != null && last.accuracy > accuracyMax) {
         anomalies.push({
             type: 'accuracy',
             severity: 'low',
@@ -48,8 +54,10 @@ function detectLocalAnomalies(history, speedKmh, speedLimit = 80) {
     return anomalies;
 }
 
-async function detectAnomalies(history, speedKmh, speedLimit) {
-    const local = detectLocalAnomalies(history, speedKmh, speedLimit);
+async function detectAnomalies(history, speedKmh, caseId) {
+    const rules = getRulesForCase(caseId);
+    const speedLimit = rules.speed_limit_kmh ?? 80;
+    const local = detectLocalAnomalies(history, speedKmh, rules);
     if (history.length < 8) return local;
 
     try {

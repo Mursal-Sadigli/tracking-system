@@ -3,12 +3,20 @@ import Dashboard from './Dashboard';
 import CommandDesk from './command/CommandDesk';
 import MissionPanel from './mission/MissionPanel';
 import IntelPanel from './intel/IntelPanel';
+import MediaGalleryPage from './media/MediaGalleryPage';
 import { COMMAND_PATH } from './config';
 import './AdminHub.css';
 
 function AdminHub({ onConnectionChange }) {
     const [tab, setTab] = useState('map');
     const [selectedCaseId, setSelectedCaseId] = useState(null);
+    const [routineZones, setRoutineZones] = useState([]);
+    const [mediaBadge, setMediaBadge] = useState(0);
+
+    const openMediaTab = () => {
+        setTab('media');
+        setMediaBadge(0);
+    };
 
     return (
         <div className="admin-hub">
@@ -26,6 +34,19 @@ function AdminHub({ onConnectionChange }) {
                     onClick={() => setTab('command')}
                 >
                     Əməliyyat
+                </button>
+                <button
+                    type="button"
+                    className={tab === 'media' ? 'is-active' : ''}
+                    onClick={() => {
+                        setTab('media');
+                        setMediaBadge(0);
+                    }}
+                >
+                    Kamera
+                    {mediaBadge > 0 && (
+                        <span className="admin-hub__badge">{mediaBadge}</span>
+                    )}
                 </button>
                 <button
                     type="button"
@@ -48,10 +69,23 @@ function AdminHub({ onConnectionChange }) {
 
             {tab === 'map' && <Dashboard onConnectionChange={onConnectionChange} />}
             {tab === 'command' && (
-                <CommandDesk onCaseSelect={(c) => setSelectedCaseId(c?.case_id)} />
+                <CommandDesk
+                    routineZones={routineZones}
+                    onCaseSelect={(c) => setSelectedCaseId(c?.case_id)}
+                    onOpenMediaTab={openMediaTab}
+                    onMediaCaptured={() => setMediaBadge((n) => n + 1)}
+                />
+            )}
+            {tab === 'media' && (
+                <MediaGalleryPage
+                    selectedCaseId={selectedCaseId}
+                    onNewMedia={() => setMediaBadge((n) => n + 1)}
+                />
             )}
             {tab === 'mission' && <MissionPanel selectedCaseId={selectedCaseId} />}
-            {tab === 'intel' && <IntelPanel selectedCaseId={selectedCaseId} />}
+            {tab === 'intel' && (
+                <IntelPanel selectedCaseId={selectedCaseId} onRoutineZones={setRoutineZones} />
+            )}
         </div>
     );
 }

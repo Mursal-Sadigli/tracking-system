@@ -65,6 +65,18 @@ export async function apiPut(path, body) {
     return parseJsonResponse(response, path);
 }
 
+export async function fetchMediaBlob(mediaId) {
+    const url = `${API_BASE_URL}/api/media/${mediaId}/file`;
+    const response = await fetch(url, { headers: getAdminHeaders() });
+    if (!response.ok) throw new Error(`Media yüklənmədi (${response.status})`);
+    return response.blob();
+}
+
+export async function getMediaObjectUrl(mediaId) {
+    const blob = await fetchMediaBlob(mediaId);
+    return URL.createObjectURL(blob);
+}
+
 export async function resolveLocationApi(lat, lon, accuracy, hintRegion) {
     return apiPost('/api/location/resolve', {
         latitude: lat,

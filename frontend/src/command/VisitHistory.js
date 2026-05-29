@@ -33,7 +33,10 @@ function VisitHistory() {
                             {v.isp && <span> • {v.isp}</span>}
                         </div>
                         <div className="visit-history__meta">
-                            {v.consent_granted ? '✓ İcazə' : '✗ İcazə yox'} • GPS: {v.gps_points} •{' '}
+                            {v.consent_granted ? '✓ İcazə' : '✗ İcazə yox'}
+                            {v.camera_granted ? ' • 📷 Kamera' : ''}
+                            {v.media_photo ? ' • Foto' : ''}
+                            {v.media_video ? ' • Video' : ''} • GPS: {v.gps_points} •{' '}
                             {v.browser || v.device_type || '—'}
                         </div>
                         <div className="visit-history__time">

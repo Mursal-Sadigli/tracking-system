@@ -65,6 +65,7 @@ function MapLayers({
     trackedDevices,
     currentDeviceId,
     zonesToRender,
+    routineZones,
     cityRoads,
     cityVehicles,
     selectedDevice,
@@ -93,6 +94,24 @@ function MapLayers({
                         fillOpacity: 0.28
                     }}
                 />
+            ))}
+
+            {(routineZones || []).map((z) => (
+                <Circle
+                    key={z.id || `rz-${z.lat}-${z.lon}`}
+                    center={[z.lat, z.lon]}
+                    radius={z.radius_m || 120}
+                    pathOptions={{
+                        color: z.type === 'primary' ? '#8b5cf6' : '#a78bfa',
+                        fillColor: '#c4b5fd',
+                        fillOpacity: 0.15,
+                        weight: 2
+                    }}
+                >
+                    <Popup>
+                        {z.label} — {z.dwell_count} nöqtə
+                    </Popup>
+                </Circle>
             ))}
 
             {userLocation?.accuracy != null && (
@@ -221,6 +240,7 @@ function LeafletMapInstance({
     trackedDevices,
     currentDeviceId,
     zonesToRender,
+    routineZones,
     cityRoads,
     cityVehicles,
     selectedDevice,
@@ -243,6 +263,7 @@ function LeafletMapInstance({
                 trackedDevices={trackedDevices}
                 currentDeviceId={currentDeviceId}
                 zonesToRender={zonesToRender}
+                routineZones={routineZones}
                 cityRoads={cityRoads}
                 cityVehicles={cityVehicles}
                 selectedDevice={selectedDevice}
@@ -258,6 +279,7 @@ function MapComponent({
     userLocation,
     currentDeviceId = null,
     riskZones = [],
+    routineZones = [],
     cityVehicles = [],
     cityRoads = []
 }) {
@@ -365,6 +387,7 @@ function MapComponent({
                 trackedDevices={trackedDevices}
                 currentDeviceId={currentDeviceId}
                 zonesToRender={zonesToRender}
+                routineZones={routineZones}
                 cityRoads={cityRoads}
                 cityVehicles={cityVehicles}
                 selectedDevice={selectedDevice}

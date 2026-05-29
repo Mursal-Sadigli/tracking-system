@@ -1,6 +1,13 @@
 const { store, persist } = require('./store');
+const { emitCaseEvent } = require('./events');
 
 const SUBJECT_POSITIONS = new Map();
+const coLocationMeetingCooldown = new Map();
+let meetingHandler = null;
+
+function setCoLocationHandler(handler) {
+    meetingHandler = handler;
+}
 
 function updateSubjectPosition(deviceId, lat, lon, caseId) {
     SUBJECT_POSITIONS.set(deviceId, {
@@ -12,7 +19,7 @@ function updateSubjectPosition(deviceId, lat, lon, caseId) {
     checkCoLocation(deviceId, lat, lon, caseId);
 }
 
-function checkCoLocation(deviceId, lat, lon, caseId) {
+async function checkCoLocation(deviceId, lat, lon, caseId) {
     const radiusM = 50;
     const minDurationMs = 60000;
     const now = Date.now();
@@ -50,6 +57,13 @@ function checkCoLocation(deviceId, lat, lon, caseId) {
                     store.coLocationEvents = store.coLocationEvents.slice(-400);
                 }
                 persist();
+
+                const coolKey = key;
+                const lastAlert = coLocationMeetingCooldown.get(coolKey) || 0;
+                if (now - lastAlert > 120000 && meetingHandler) {
+                    coLocationMeetingCooldown.set(coolKey, now);
+                    await meetingHandler(evt);
+                }
             }
         }
     }
@@ -94,10 +108,26 @@ function buildHeatmapFromHistories(histories, maxPoints = 200) {
     return heat.slice(-maxPoints);
 }
 
+function cacheRoutineZones(caseId, zones) {
+    if (!store.routineZones) store.routineZones = {};
+    store.routineZones[caseId] = {
+        zones,
+        updated_at: new Date().toISOString()
+    };
+    persist();
+}
+
+function getRoutineZones(caseId) {
+    return store.routineZones?.[caseId] || null;
+}
+
 module.exports = {
     updateSubjectPosition,
     getCoLocationEvents,
     buildDwellZones,
     buildHeatmapFromHistories,
+    setCoLocationHandler,
+    cacheRoutineZones,
+    getRoutineZones,
     SUBJECT_POSITIONS
 };

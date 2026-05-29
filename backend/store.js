@@ -16,7 +16,12 @@ const store = {
     coLocationEvents: [],
     operatorSessions: new Map(),
     visitHistory: [],
-    shareLinks: new Map()
+    shareLinks: new Map(),
+    riskSnapshots: {},
+    anomalyRules: { global: {}, by_case: {} },
+    caseBriefings: {},
+    routineZones: {},
+    mediaRecords: []
 };
 
 function serialize() {
@@ -32,7 +37,12 @@ function serialize() {
         coLocationEvents: store.coLocationEvents.slice(-500),
         operatorSessions: Array.from(store.operatorSessions.entries()),
         visitHistory: store.visitHistory || [],
-        shareLinks: Array.from((store.shareLinks || new Map()).entries())
+        shareLinks: Array.from((store.shareLinks || new Map()).entries()),
+        riskSnapshots: store.riskSnapshots || {},
+        anomalyRules: store.anomalyRules || { global: {}, by_case: {} },
+        caseBriefings: store.caseBriefings || {},
+        routineZones: store.routineZones || {},
+        mediaRecords: (store.mediaRecords || []).slice(-2000)
     };
 }
 
@@ -50,6 +60,11 @@ function hydrate(data) {
     store.operatorSessions = new Map(data.operatorSessions || []);
     store.visitHistory = data.visitHistory || [];
     store.shareLinks = new Map(data.shareLinks || []);
+    store.riskSnapshots = data.riskSnapshots || {};
+    store.anomalyRules = data.anomalyRules || { global: {}, by_case: {} };
+    store.caseBriefings = data.caseBriefings || {};
+    store.routineZones = data.routineZones || {};
+    store.mediaRecords = data.mediaRecords || [];
 }
 
 function persist() {

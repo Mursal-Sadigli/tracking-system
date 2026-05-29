@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet, apiPut, apiPost } from '../api';
+import { getTrackingSocket } from '../socketService';
 import './MissionPanel.css';
 
 function MissionPanel({ selectedCaseId }) {
@@ -24,6 +25,36 @@ function MissionPanel({ selectedCaseId }) {
         apiGet(`/api/cases/${selectedCaseId}/mission/phases`, { admin: true })
             .then((d) => setPhases(d.phases || []))
             .catch(() => {});
+    }, [selectedCaseId]);
+
+    useEffect(() => {
+        if (!selectedCaseId) return;
+        apiGet(`/api/cases/${selectedCaseId}/briefing`, { admin: true })
+            .then((b) => {
+                if (b?.text) setBriefing(b);
+            })
+            .catch(() => {});
+    }, [selectedCaseId]);
+
+    useEffect(() => {
+        if (!selectedCaseId) return;
+        const socket = getTrackingSocket();
+        const onBriefing = (b) => {
+            if (b.case_id === selectedCaseId) setBriefing(b);
+        };
+        const onCaseEvent = (ev) => {
+            if (ev.case_id === selectedCaseId && ev.type === 'briefing_updated') {
+                apiGet(`/api/cases/${selectedCaseId}/briefing`, { admin: true })
+                    .then((b) => b?.text && setBriefing(b))
+                    .catch(() => {});
+            }
+        };
+        socket.on('briefing_updated', onBriefing);
+        socket.on('case_event', onCaseEvent);
+        return () => {
+            socket.off('briefing_updated', onBriefing);
+            socket.off('case_event', onCaseEvent);
+        };
     }, [selectedCaseId]);
 
     useEffect(() => {
@@ -142,8 +173,13 @@ function MissionPanel({ selectedCaseId }) {
 
             <section>
                 <h3>Briefing</h3>
+                <p className="mission-panel__briefing-meta">
+                    {briefing?.updated_at
+                        ? `Avtomatik: ${new Date(briefing.updated_at).toLocaleString('az-AZ')}`
+                        : 'Hələ briefing yoxdur — hadisə və ya 30 dəq interval'}
+                </p>
                 <button type="button" onClick={generateBriefing}>
-                    Briefing yarat
+                    Briefing yarat (əl ilə)
                 </button>
                 {briefing?.text && <p className="mission-panel__briefing">{briefing.text}</p>}
                 {briefing?.bullets && (

@@ -1,0 +1,34 @@
+.anomaly-rules__field {
+    display: block;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.anomaly-rules__field input {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #475569;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+.anomaly-rules__toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+}
+
+.anomaly-rules__save {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
