@@ -94,6 +94,31 @@ function deleteByIds(mediaIds) {
     return removed;
 }
 
+function matchesCategory(record, category) {
+    if (!record || !category) return false;
+    if (category === 'audio') return record.type === 'audio';
+    if (category === 'periodic') {
+        return record.type === 'photo' && record.capture_source === 'periodic';
+    }
+    if (category === 'photo') {
+        return record.type === 'photo' && record.capture_source !== 'periodic';
+    }
+    if (category === 'video') return record.type === 'video';
+    return false;
+}
+
+function listIdsByCaseCategory(caseId, category) {
+    return (store.mediaRecords || [])
+        .filter((r) => r.case_id === caseId && matchesCategory(r, category))
+        .map((r) => r.id);
+}
+
+function deleteByCaseCategory(caseId, category) {
+    const ids = listIdsByCaseCategory(caseId, category);
+    if (!ids.length) return [];
+    return deleteByIds(ids);
+}
+
 function deleteOlderThan(days) {
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
     const kept = [];
@@ -125,5 +150,8 @@ module.exports = {
     listRecent,
     deleteOlderThan,
     deleteById,
-    deleteByIds
+    deleteByIds,
+    deleteByCaseCategory,
+    matchesCategory,
+    listIdsByCaseCategory
 };

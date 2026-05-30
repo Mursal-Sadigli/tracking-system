@@ -161,6 +161,29 @@ function createMediaRouter({ io, requireAdminKey }) {
         res.json({ ok: true, deleted: removed.length, ids: removed.map((r) => r.id) });
     });
 
+    router.post('/delete-by-category', admin, (req, res) => {
+        const caseId = req.body?.case_id;
+        const category = req.body?.category;
+        const valid = ['photo', 'video', 'audio', 'periodic'];
+        if (!caseId || !valid.includes(category)) {
+            return res.status(400).json({ error: 'invalid_case_or_category' });
+        }
+        const removed = media.deleteByCaseCategory(caseId, category);
+        if (io && removed.length) {
+            io.emit('media_deleted', {
+                ids: removed.map((r) => r.id),
+                case_ids: [caseId]
+            });
+        }
+        res.json({
+            ok: true,
+            deleted: removed.length,
+            ids: removed.map((r) => r.id),
+            category,
+            case_id: caseId
+        });
+    });
+
     router.delete('/:mediaId', admin, (req, res) => {
         const rec = media.deleteById(req.params.mediaId);
         if (!rec) return res.status(404).json({ error: 'not_found' });

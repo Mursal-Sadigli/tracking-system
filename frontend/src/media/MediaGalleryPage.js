@@ -9,6 +9,29 @@ const SECTIONS = [
     { id: 'periodic', label: 'Saatlıq kadrlar' }
 ];
 
+const BULK_DELETE_CATEGORIES = [
+    { id: 'photo', label: 'Fotolar' },
+    { id: 'video', label: 'Videolar' },
+    { id: 'audio', label: 'Səs yazıları' },
+    { id: 'periodic', label: 'Saatlıq kadrlar' }
+];
+
+function matchesCategory(item, categoryId) {
+    if (categoryId === 'audio') return item.type === 'audio';
+    if (categoryId === 'periodic') {
+        return item.type === 'photo' && item.capture_source === 'periodic';
+    }
+    if (categoryId === 'photo') {
+        return item.type === 'photo' && item.capture_source !== 'periodic';
+    }
+    if (categoryId === 'video') return item.type === 'video';
+    return false;
+}
+
+function itemsForCategory(items, categoryId) {
+    return items.filter((i) => matchesCategory(i, categoryId));
+}
+
 function filterBySection(items, sectionId) {
     if (sectionId === 'audio') {
         return items.filter((i) => i.type === 'audio');
@@ -50,13 +73,14 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
     const [typeFilter, setTypeFilter] = useState('all');
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
+    const [bulkDeletingCategory, setBulkDeletingCategory] = useState(null);
 
     const loadMedia = useCallback(async () => {
         setLoading(true);
         setLoadError('');
         try {
             const path = selectedCaseId
-                ? `/api/cases/${selectedCaseId}/media?limit=120`
+                ? `/api/cases/${selectedCaseId}/media?limit=500`
                 : '/api/media/recent?limit=120';
             const data = await apiGet(path, { admin: true });
             const list = data.media || [];
@@ -115,12 +139,35 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
         };
     }, [selectedCaseId, onNewMedia]);
 
-    const filteredAll = useMemo(() => {
-        const base = selectedCaseId
-            ? items.filter((i) => i.case_id === selectedCaseId)
-            : items;
-        return filterBySection(base, section);
-    }, [items, selectedCaseId, section]);
+    const caseItems = useMemo(() => {
+        if (!selectedCaseId) return items;
+        return items.filter((i) => i.case_id === selectedCaseId);
+    }, [items, selectedCaseId]);
+
+    const categoryCounts = useMemo(() => {
+        const out = {};
+        for (const cat of BULK_DELETE_CATEGORIES) {
+            out[cat.id] = itemsForCategory(caseItems, cat.id).length;
+        }
+        return out;
+    }, [caseItems]);
+
+    const applyDeletedIds = useCallback((ids) => {
+        if (!ids?.length) return;
+        const idSet = new Set(ids);
+        setItems((prev) => prev.filter((p) => !idSet.has(p.id)));
+        setCheckedIds((prev) => {
+            const next = new Set(prev);
+            ids.forEach((id) => next.delete(id));
+            return next;
+        });
+        setSelected((prev) => (prev && idSet.has(prev.id) ? null : prev));
+        if (ids.some((id) => selected?.id === id)) {
+            setPreviewUrl(null);
+        }
+    }, [selected?.id]);
+
+    const filteredAll = useMemo(() => filterBySection(caseItems, section), [caseItems, section]);
 
     useEffect(() => {
         setSelected((prev) => {
@@ -189,16 +236,51 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
         setDeleteError('');
         try {
             await apiPost('/api/media/delete-batch', { ids }, { admin: true });
-            setItems((prev) => prev.filter((p) => !ids.includes(p.id)));
+            applyDeletedIds(ids);
             setCheckedIds(new Set());
-            if (selected && ids.includes(selected.id)) {
-                setSelected(null);
-                setPreviewUrl(null);
-            }
         } catch (e) {
             setDeleteError(e?.message || 'Silinmədi');
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const deleteAllCategory = async (categoryId) => {
+        const cat = BULK_DELETE_CATEGORIES.find((c) => c.id === categoryId);
+        const count = categoryCounts[categoryId] || 0;
+        if (!count || !cat) return;
+
+        const scope = selectedCaseId
+            ? 'seçilmiş tapşırıq üzrə'
+            : 'siyahıda görünən';
+        if (
+            !window.confirm(
+                `${cat.label} — ${count} fayl silinsin? (${scope}, geri qaytarıla bilməz)`
+            )
+        ) {
+            return;
+        }
+
+        setBulkDeletingCategory(categoryId);
+        setDeleteError('');
+        try {
+            if (selectedCaseId) {
+                const data = await apiPost(
+                    '/api/media/delete-by-category',
+                    { case_id: selectedCaseId, category: categoryId },
+                    { admin: true }
+                );
+                applyDeletedIds(data.ids || []);
+            } else {
+                const ids = itemsForCategory(caseItems, categoryId).map((i) => i.id);
+                await apiPost('/api/media/delete-batch', { ids }, { admin: true });
+                applyDeletedIds(ids);
+            }
+            setCheckedIds(new Set());
+        } catch (e) {
+            setDeleteError(e?.message || 'Silinmədi');
+        } finally {
+            setBulkDeletingCategory(null);
         }
     };
 
@@ -225,15 +307,12 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
     };
 
     const counts = useMemo(() => {
-        const base = selectedCaseId
-            ? items.filter((i) => i.case_id === selectedCaseId)
-            : items;
         return {
-            av: filterBySection(base, 'av').length,
-            audio: filterBySection(base, 'audio').length,
-            periodic: filterBySection(base, 'periodic').length
+            av: filterBySection(caseItems, 'av').length,
+            audio: filterBySection(caseItems, 'audio').length,
+            periodic: filterBySection(caseItems, 'periodic').length
         };
-    }, [items, selectedCaseId]);
+    }, [caseItems]);
 
     return (
         <div className="media-gallery">
@@ -252,6 +331,31 @@ function MediaGalleryPage({ selectedCaseId, onNewMedia }) {
                         </button>
                     ))}
                 </nav>
+                <div className="media-gallery__bulk-delete">
+                    <p className="media-gallery__bulk-title">Hamısını sil</p>
+                    {!selectedCaseId && (
+                        <p className="media-gallery__bulk-hint">
+                            Tapşırıq seçin — bütün media silinəcək (120 limit deyil).
+                        </p>
+                    )}
+                    <div className="media-gallery__bulk-grid">
+                        {BULK_DELETE_CATEGORIES.map((cat) => {
+                            const n = categoryCounts[cat.id] || 0;
+                            const busy = bulkDeletingCategory === cat.id;
+                            return (
+                                <button
+                                    key={cat.id}
+                                    type="button"
+                                    className="media-gallery__bulk-btn"
+                                    disabled={n === 0 || deleting || Boolean(bulkDeletingCategory)}
+                                    onClick={() => deleteAllCategory(cat.id)}
+                                >
+                                    {busy ? 'Silinir…' : `${cat.label} (${n})`}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
                 <div className="media-gallery__toolbar">
                     <button
                         type="button"
