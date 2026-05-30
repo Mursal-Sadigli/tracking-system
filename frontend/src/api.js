@@ -86,12 +86,22 @@ export async function getMediaObjectUrl(mediaId) {
     return URL.createObjectURL(blob);
 }
 
-export async function resolveLocationApi(lat, lon, accuracy, hintRegion, clientIp) {
+export async function resolveLocationApi(lat, lon, accuracy, hintRegion, clientIp, trustBrowserGps = false) {
     return apiPost('/api/location/resolve', {
         latitude: lat,
         longitude: lon,
         accuracy: accuracy ?? null,
         hint_region: hintRegion || null,
-        client_ip: clientIp || null
+        client_ip: clientIp || null,
+        trust_browser_gps: trustBrowserGps === true
     });
+}
+
+export async function fetchPlaceFromGps(lat, lon, accuracy) {
+    const q = new URLSearchParams({
+        lat: String(lat),
+        lon: String(lon)
+    });
+    if (accuracy != null) q.set('accuracy', String(accuracy));
+    return apiGet(`/api/location/place?${q.toString()}`);
 }

@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -21,7 +23,11 @@ const { getConsentLogs } = require('./compliance');
 
 const PYTHON_SERVICE_DIR = path.join(__dirname, '..', 'python-service');
 const PYTHON_LOCATION_API = process.env.PYTHON_LOCATION_API || 'http://127.0.0.1:5001';
-const { resolveLocationWithPython, pickClientIpForResolve } = require('./locationResolve');
+const {
+    resolveLocationWithPython,
+    resolvePlaceFromGps,
+    pickClientIpForResolve
+} = require('./locationResolve');
 
 const app = express();
 const server = http.createServer(app);
@@ -451,7 +457,14 @@ app.get('/api/analytics/risk-zones', (req, res) => {
 // Python ilə konum düzəlişi (Bakı təxmini → real region)
 app.post('/api/location/resolve', async (req, res) => {
     try {
-        const { latitude, longitude, accuracy, client_ip: bodyIp, hint_region: hintRegion } = req.body;
+        const {
+            latitude,
+            longitude,
+            accuracy,
+            client_ip: bodyIp,
+            hint_region: hintRegion,
+            trust_browser_gps: trustBrowserGps
+        } = req.body;
         const clientIp = pickClientIpForResolve(
             bodyIp,
             req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
@@ -463,9 +476,37 @@ app.post('/api/location/resolve', async (req, res) => {
             longitude,
             accuracy,
             clientIp,
-            hintRegion
+            hintRegion,
+            { trustBrowserGps: trustBrowserGps === true }
         );
         res.json(resolved);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/location/place', async (req, res) => {
+    try {
+        const latitude = Number(req.query.lat);
+        const longitude = Number(req.query.lon);
+        const accuracy = req.query.accuracy != null ? Number(req.query.accuracy) : null;
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return res.status(400).json({ error: 'invalid_coords' });
+        }
+        const { reverseGeocodePlace } = require('./geocodePlace');
+        const place = await reverseGeocodePlace(latitude, longitude);
+        res.json({
+            display_line: place.display_line,
+            city: place.city,
+            district: place.district,
+            suburb: place.suburb,
+            country: place.country,
+            region_key: place.region_key,
+            region_label: place.region_label,
+            source: place.source,
+            latitude: place.latitude,
+            longitude: place.longitude
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -616,6 +657,10 @@ server.listen(PORT, () => {
     console.log(`📡 WebSocket ready for connections`);
     console.log(`🌐 CORS extras: ${EXTRA_ORIGINS.length ? EXTRA_ORIGINS.join(', ') : '(none)'}`);
     console.log(`🐍 Python location API: ${PYTHON_LOCATION_API}/resolve`);
+    const geoProviders = ['nominatim'];
+    if (process.env.GOOGLE_GEOCODING_API_KEY) geoProviders.unshift('google');
+    if (process.env.MAPBOX_ACCESS_TOKEN) geoProviders.unshift('mapbox');
+    console.log(`📍 Geocoding: ${geoProviders.join(' → ')}`);
     if (shouldSpawnLocalPython()) {
         setTimeout(() => startPythonLocationApi(), 1500);
     } else {

@@ -22,6 +22,7 @@ const watchZones = require('./watchZones');
 const { buildZoneSnapshot } = require('./areaProviders');
 const subjectIntel = require('./subjectIntel');
 const { lookupIp } = require('./ipLookup');
+const { getMlSnapshot } = require('./mlService');
 
 function createApiRouter({ activeDevices, deviceHistory, requireAdminKey, io }) {
     const router = express.Router();
@@ -161,6 +162,51 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey, io }) 
         const snap = getRiskSnapshot(req.params.caseId);
         if (!snap) return res.json({ case_id: req.params.caseId, score: null, history: [] });
         res.json(snap);
+    });
+
+    router.get('/intel/ml/:caseId', admin, (req, res) => {
+        const caseId = req.params.caseId;
+        const c = cases.getCaseById(caseId);
+        if (!c) return res.status(404).json({ error: 'not_found' });
+        const ml = getMlSnapshot(caseId);
+        const risk = getRiskSnapshot(caseId);
+        if (ml) return res.json(ml);
+        if (risk?.explanations?.length) {
+            return res.json({
+                case_id: caseId,
+                device_id: c.device_id,
+                updated_at: risk.updated_at,
+                model_version: risk.model_version,
+                risk_score: risk.score,
+                risk_level: risk.risk_level,
+                explanations: risk.explanations,
+                baseline: risk.baseline,
+                anomalies: []
+            });
+        }
+        res.json({ case_id: caseId, device_id: c.device_id, explanations: [], baseline: null });
+    });
+
+    router.post('/intel/ml/retrain', admin, (req, res) => {
+        const { spawnSync } = require('child_process');
+        const path = require('path');
+        const inputPath = req.body?.input_path;
+        if (!inputPath) {
+            return res.status(400).json({ error: 'input_path_required' });
+        }
+        const script = path.join(__dirname, '..', 'python-service', 'scripts', 'train_ml.py');
+        const result = spawnSync(process.env.PYTHON_BIN || 'python', [script, '--input', inputPath], {
+            encoding: 'utf8',
+            timeout: 120000
+        });
+        if (result.status !== 0) {
+            return res.status(500).json({ error: 'retrain_failed', detail: result.stderr || result.stdout });
+        }
+        try {
+            res.json(JSON.parse(result.stdout.trim()));
+        } catch {
+            res.json({ ok: true, output: result.stdout });
+        }
     });
 
     router.get('/anomaly-rules', admin, (req, res) => {

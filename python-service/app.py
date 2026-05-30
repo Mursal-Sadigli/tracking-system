@@ -16,6 +16,9 @@ from geofence_engine import batch_check
 from intel_engine import build_profile, build_routine_clusters
 from location_resolver import resolve_location
 from area_fusion import fuse_area_zone
+from ml.engine import score_tracking
+from ml.baseline import reset_baseline
+from ml.model_store import health_info as ml_health_info
 
 app = FastAPI(title="Tracking Python API", version="2.0.0")
 
@@ -33,6 +36,7 @@ class ResolveBody(BaseModel):
     accuracy: Optional[float] = None
     client_ip: Optional[str] = None
     hint_region: Optional[str] = None
+    trust_browser_gps: bool = False
 
 
 class AnalyticsBody(BaseModel):
@@ -69,6 +73,18 @@ class AreaFuseBody(BaseModel):
     providers: Dict[str, Any] = {}
 
 
+class MlScoreBody(BaseModel):
+    device_id: Optional[str] = None
+    case_id: Optional[str] = None
+    history: List[Dict[str, Any]] = []
+    current: Optional[Dict[str, Any]] = None
+    context: Dict[str, Any] = {}
+
+
+class MlBaselineResetBody(BaseModel):
+    device_id: str
+
+
 @app.get("/health")
 @app.get("/")
 def health():
@@ -83,6 +99,7 @@ def post_resolve(body: ResolveBody):
         accuracy=body.accuracy,
         client_ip=body.client_ip,
         hint_region=body.hint_region,
+        trust_browser_gps=body.trust_browser_gps,
     )
 
 
@@ -135,6 +152,22 @@ def post_area_briefing(body: AreaFuseBody):
             body.providers,
         )
     }
+
+
+@app.post("/ml/score")
+def post_ml_score(body: MlScoreBody):
+    return score_tracking(body.model_dump())
+
+
+@app.get("/ml/health")
+def get_ml_health():
+    return {"status": "ok", **ml_health_info()}
+
+
+@app.post("/ml/baseline/reset")
+def post_ml_baseline_reset(body: MlBaselineResetBody):
+    reset_baseline(body.device_id)
+    return {"ok": True, "device_id": body.device_id}
 
 
 if __name__ == "__main__":

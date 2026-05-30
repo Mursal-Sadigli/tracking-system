@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawnSync } = require('child_process');
 const axios = require('axios');
+const { reverseGeocodePlace } = require('./geocodePlace');
 
 const PYTHON_LOCATION_API = process.env.PYTHON_LOCATION_API || 'http://127.0.0.1:5001';
 const PYTHON_SERVICE_DIR = path.join(__dirname, '..', 'python-service');
@@ -36,8 +37,16 @@ function getPythonExecutable() {
     return process.env.PYTHON_BIN || 'python';
 }
 
-async function resolveLocationWithPython(latitude, longitude, accuracy, clientIp, hintRegion) {
-    const cacheKey = `${Number(latitude).toFixed(3)}_${Number(longitude).toFixed(3)}_${clientIp || 'noip'}_${hintRegion || ''}`;
+async function resolveLocationWithPython(
+    latitude,
+    longitude,
+    accuracy,
+    clientIp,
+    hintRegion,
+    options = {}
+) {
+    const trustBrowserGps = options.trustBrowserGps === true;
+    const cacheKey = `${Number(latitude).toFixed(3)}_${Number(longitude).toFixed(3)}_${clientIp || 'noip'}_${hintRegion || ''}_t${trustBrowserGps ? 1 : 0}`;
     const cached = locationResolveCache.get(cacheKey);
     if (cached && Date.now() - cached.at < LOCATION_CACHE_MS) {
         return cached.result;
@@ -48,7 +57,8 @@ async function resolveLocationWithPython(latitude, longitude, accuracy, clientIp
         longitude: Number(longitude),
         accuracy: accuracy != null ? Number(accuracy) : null,
         client_ip: clientIp || null,
-        hint_region: hintRegion || null
+        hint_region: hintRegion || null,
+        trust_browser_gps: trustBrowserGps
     };
 
     let result = null;
@@ -92,61 +102,56 @@ async function resolveLocationWithPython(latitude, longitude, accuracy, clientIp
         };
     }
 
-    if (!result.city && payload.latitude != null && payload.longitude != null) {
-        const geo = await reverseGeocodeNominatim(payload.latitude, payload.longitude);
-        if (geo.city) result.city = geo.city;
-        if (geo.country && !result.country) result.country = geo.country;
-        if (!result.region || result.region === 'unknown') result.region = geo.region || result.region;
+    if (payload.latitude != null && payload.longitude != null) {
+        const place = await reverseGeocodePlace(payload.latitude, payload.longitude);
+        if (place.display_line || place.city) {
+            result.city = place.display_line || place.city;
+            result.browser_city = place.city;
+            result.display_line = place.display_line;
+            result.district = place.district;
+            result.region = place.region_key || result.region;
+            result.region_label = place.region_label;
+            result.geocode_source = place.source;
+        }
+        if (place.country && !result.country) result.country = place.country;
     }
 
     locationResolveCache.set(cacheKey, { at: Date.now(), result });
     return result;
 }
 
-const nominatimCache = new Map();
+async function resolvePlaceFromGps(latitude, longitude, accuracy) {
+    const place = await reverseGeocodePlace(latitude, longitude);
+    const resolved = await resolveLocationWithPython(latitude, longitude, accuracy, null, null, {
+        trustBrowserGps: true
+    });
+    return {
+        ...resolved,
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+        city: place.display_line || place.city,
+        browser_city: place.city,
+        display_line: place.display_line,
+        district: place.district,
+        suburb: place.suburb,
+        country: place.country || resolved.country,
+        region: place.region_key || resolved.region,
+        region_label: place.region_label,
+        geocode_source: place.source
+    };
+}
 
+/** @deprecated use reverseGeocodePlace */
 async function reverseGeocodeNominatim(lat, lon) {
-    const key = `${Number(lat).toFixed(4)}_${Number(lon).toFixed(4)}`;
-    const cached = nominatimCache.get(key);
-    if (cached && Date.now() - cached.at < 60000) return cached.data;
-
-    try {
-        const res = await axios.get('https://nominatim.openstreetmap.org/reverse', {
-            params: {
-                lat,
-                lon,
-                format: 'json',
-                zoom: 12,
-                addressdetails: 1
-            },
-            timeout: 5000,
-            headers: { 'User-Agent': 'TrackingSystem-Node/1.0' }
-        });
-        const addr = res.data?.address || {};
-        const city =
-            addr.city ||
-            addr.town ||
-            addr.village ||
-            addr.municipality ||
-            addr.county ||
-            addr.state ||
-            '';
-        const data = {
-            city,
-            country: addr.country || '',
-            region: ''
-        };
-        nominatimCache.set(key, { at: Date.now(), data });
-        return data;
-    } catch (e) {
-        console.warn('Nominatim:', e.message);
-        return { city: '', country: '', region: '' };
-    }
+    const p = await reverseGeocodePlace(lat, lon);
+    return { city: p.city, country: p.country, region: p.region_key };
 }
 
 module.exports = {
     resolveLocationWithPython,
+    resolvePlaceFromGps,
     pickClientIpForResolve,
     isPrivateIp,
-    reverseGeocodeNominatim
+    reverseGeocodeNominatim,
+    reverseGeocodePlace
 };

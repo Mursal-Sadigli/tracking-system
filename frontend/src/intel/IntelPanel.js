@@ -11,8 +11,19 @@ function IntelPanel({ selectedCaseId, onRoutineZones }) {
     const [coLocation, setCoLocation] = useState([]);
     const [heatmap, setHeatmap] = useState([]);
     const [risk, setRisk] = useState(null);
+    const [mlIntel, setMlIntel] = useState(null);
     const [routine, setRoutine] = useState(null);
     const [subTab, setSubTab] = useState('risk');
+
+    const loadMlIntel = useCallback(async () => {
+        if (!selectedCaseId) return;
+        try {
+            const data = await apiGet(`/api/intel/ml/${selectedCaseId}`, { admin: true });
+            setMlIntel(data);
+        } catch {
+            setMlIntel(null);
+        }
+    }, [selectedCaseId]);
 
     const loadRisk = useCallback(async () => {
         if (!selectedCaseId) return;
@@ -45,8 +56,9 @@ function IntelPanel({ selectedCaseId, onRoutineZones }) {
             .then(setProfile)
             .catch(() => setProfile(null));
         loadRisk();
+        loadMlIntel();
         loadRoutine();
-    }, [selectedCaseId, loadRisk, loadRoutine]);
+    }, [selectedCaseId, loadRisk, loadMlIntel, loadRoutine]);
 
     useEffect(() => {
         apiGet('/api/intel/co-location', { admin: true })
@@ -66,8 +78,23 @@ function IntelPanel({ selectedCaseId, onRoutineZones }) {
                     score: payload.score,
                     risk_level: payload.risk_level,
                     updated_at: payload.updated_at,
-                    history: payload.history || prev?.history || []
+                    history: payload.history || prev?.history || [],
+                    model_version: payload.model_version,
+                    explanations: payload.ml_explanations || prev?.explanations || [],
+                    baseline: payload.baseline || prev?.baseline
                 }));
+                if (payload.ml_explanations?.length || payload.baseline) {
+                    setMlIntel((prev) => ({
+                        ...prev,
+                        case_id: payload.case_id,
+                        model_version: payload.model_version,
+                        explanations: payload.ml_explanations || [],
+                        baseline: payload.baseline,
+                        updated_at: payload.updated_at,
+                        risk_score: payload.score,
+                        risk_level: payload.risk_level
+                    }));
+                }
             }
         };
         const onCoLoc = (evt) => {
@@ -118,6 +145,39 @@ function IntelPanel({ selectedCaseId, onRoutineZones }) {
                         </span>
                     </div>
                     <RiskTrend history={risk?.history || []} />
+                    <div className="intel-panel__ml">
+                        <h4>ML motoru</h4>
+                        <p className="intel-panel__meta">
+                            Model: {risk?.model_version || mlIntel?.model_version || '—'}
+                            {mlIntel?.baseline?.ready
+                                ? ` | Baseline hazır (${mlIntel.baseline.points_seen} nöqtə)`
+                                : mlIntel?.baseline
+                                  ? ` | Öyrənir (${mlIntel.baseline.points_seen || 0}/${mlIntel.baseline.min_points || 50})`
+                                  : ''}
+                        </p>
+                        {(risk?.explanations?.length > 0 || mlIntel?.explanations?.length > 0) && (
+                            <>
+                                <h5>Risk səbəbləri</h5>
+                                <ul>
+                                    {(risk?.explanations || mlIntel?.explanations || []).map((ex, i) => (
+                                        <li key={ex.feature || i}>{ex.explanation_az}</li>
+                                    ))}
+                                </ul>
+                            </>
+                        )}
+                        {mlIntel?.anomalies?.length > 0 && (
+                            <>
+                                <h5>Son ML anomaliya</h5>
+                                <ul>
+                                    {mlIntel.anomalies.slice(0, 3).map((a, i) => (
+                                        <li key={i}>
+                                            {a.explanation_az || a.type} — {a.severity}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
+                        )}
+                    </div>
                 </section>
             )}
 

@@ -157,6 +157,30 @@
     font-size: 0.75rem;
 }
 
+.command-desk__ml-alert {
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    background: #451a03;
+    border: 1px solid #ea580c;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.command-desk__ml-alert p {
+    margin: 0.35rem 0;
+}
+
+.command-desk__ml-alert button {
+    margin-top: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    background: #334155;
+    color: #e2e8f0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
 @media (max-width: 900px) {
     .command-desk {
         grid-template-columns: 1fr;

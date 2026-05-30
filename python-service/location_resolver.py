@@ -191,10 +191,12 @@ def resolve_location(
     accuracy: Optional[float] = None,
     client_ip: Optional[str] = None,
     hint_region: Optional[str] = None,
+    trust_browser_gps: bool = False,
 ) -> Dict[str, Any]:
     """
     Brauzer koordinatlarını yoxlayır; Absheron/Bakı təxmini ilə IP regionu
     uyğun gəlmirsə, Python IP + region mərkəzini tətbiq edir.
+    trust_browser_gps=True: subyekt GPS-i saxlanır, şəhər yalnız koordinatdan (IP ayrıca).
     """
     browser_lat, browser_lon = float(latitude), float(longitude)
     browser_region = region_for_coords(browser_lat, browser_lon)
@@ -204,6 +206,35 @@ def resolve_location(
     ip_loc = get_ip_location(client_ip)
     ip_region = ip_loc["region"] if ip_loc else "unknown"
     ip_city = ip_loc.get("city", "") if ip_loc else ""
+
+    if trust_browser_gps:
+        return {
+            "latitude": browser_lat,
+            "longitude": browser_lon,
+            "accuracy": accuracy,
+            "city": browser_city,
+            "country": geo_browser.get("country") or (ip_loc or {}).get("country", ""),
+            "region": browser_region,
+            "corrected": False,
+            "source": "browser_gps",
+            "reason": "trust_browser_gps",
+            "browser_latitude": browser_lat,
+            "browser_longitude": browser_lon,
+            "browser_region": browser_region,
+            "browser_city": browser_city,
+            "ip_region": ip_region,
+            "ip_city": ip_city,
+            "distance_browser_ip_m": round(
+                haversine_meters(browser_lat, browser_lon, ip_loc["latitude"], ip_loc["longitude"])
+                if ip_loc
+                else 0
+            ),
+            "location_quality": "gps"
+            if (accuracy or 9999) <= 100
+            else "approximate"
+            if (accuracy or 9999) <= 500
+            else "network",
+        }
 
     out_lat, out_lon = browser_lat, browser_lon
     corrected = False
@@ -319,6 +350,7 @@ def main() -> None:
         accuracy=payload.get("accuracy"),
         client_ip=payload.get("client_ip"),
         hint_region=payload.get("hint_region"),
+        trust_browser_gps=bool(payload.get("trust_browser_gps")),
     )
     print(json.dumps(result, ensure_ascii=False))
 

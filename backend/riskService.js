@@ -1,6 +1,8 @@
 const { store, persist } = require('./store');
 const { runAnalyticsBatch } = require('./pythonClient');
 const { getRulesForCase } = require('./anomalyRules');
+const { runMlAnomalyScore, ML_ENABLED } = require('./anomalyDetector');
+const { saveMlSnapshot } = require('./mlService');
 
 const gpsCountSinceRisk = new Map();
 const lastRiskUpdateAt = new Map();
@@ -47,13 +49,16 @@ function pushSnapshot(caseId, entry) {
         risk_level: entry.risk_level,
         updated_at: entry.ts,
         anomalies_count: entry.anomalies_count || 0,
+        model_version: entry.model_version || null,
+        explanations: entry.explanations || [],
+        baseline: entry.baseline || null,
         history
     };
     persist();
     return store.riskSnapshots[caseId];
 }
 
-async function maybeUpdateRisk(io, caseId, deviceId, history) {
+async function maybeUpdateRisk(io, caseId, deviceId, history, mlContext = {}, cachedMlResult = null) {
     if (!caseId || !history?.length) return null;
 
     const count = (gpsCountSinceRisk.get(deviceId) || 0) + 1;
@@ -67,17 +72,50 @@ async function maybeUpdateRisk(io, caseId, deviceId, history) {
     lastRiskUpdateAt.set(caseId, Date.now());
 
     const rules = getRulesForCase(caseId);
-    const batch = await runAnalyticsBatch(history, {
-        speed_limit_kmh: rules.speed_limit_kmh
-    });
-    const score = typeof batch.score === 'number' ? batch.score : 50;
-    const risk_level = batch.risk_level || riskLevelFromScore(score);
+    let mlResult = cachedMlResult;
+
+    if (!mlResult && ML_ENABLED) {
+        mlResult = await runMlAnomalyScore({
+            deviceId,
+            caseId,
+            history,
+            mlContext: { ...mlContext, device_id: deviceId, speed_limit_kmh: rules.speed_limit_kmh }
+        });
+    }
+
+    let score;
+    let risk_level;
+    let anomalies_count;
+    let model_version = null;
+    let explanations = [];
+    let baseline = null;
+
+    if (mlResult && typeof mlResult.risk_score === 'number') {
+        score = mlResult.risk_score;
+        risk_level = mlResult.risk_level || riskLevelFromScore(score);
+        anomalies_count = (mlResult.anomalies || []).length;
+        model_version = mlResult.model_version || 'v1';
+        explanations = mlResult.explanations || [];
+        baseline = mlResult.baseline || null;
+        saveMlSnapshot(caseId, { ...mlResult, device_id: deviceId });
+    } else {
+        const batch = await runAnalyticsBatch(history, {
+            speed_limit_kmh: rules.speed_limit_kmh
+        });
+        score = typeof batch.score === 'number' ? batch.score : 50;
+        risk_level = batch.risk_level || riskLevelFromScore(score);
+        anomalies_count = (batch.anomalies || []).length;
+    }
+
     const ts = new Date().toISOString();
     const snapshot = pushSnapshot(caseId, {
         score,
         risk_level,
         ts,
-        anomalies_count: (batch.anomalies || []).length
+        anomalies_count,
+        model_version,
+        explanations,
+        baseline
     });
 
     if (io) {
@@ -87,7 +125,10 @@ async function maybeUpdateRisk(io, caseId, deviceId, history) {
             score,
             risk_level,
             updated_at: ts,
-            history: snapshot.history
+            history: snapshot.history,
+            model_version,
+            ml_explanations: explanations,
+            baseline
         });
     }
 

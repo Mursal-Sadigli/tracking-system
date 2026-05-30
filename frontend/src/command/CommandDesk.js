@@ -24,6 +24,7 @@ function CommandDesk({
     const [events, setEvents] = useState([]);
     const [devices, setDevices] = useState([]);
     const [noteText, setNoteText] = useState('');
+    const [mlAlert, setMlAlert] = useState(null);
     const [operatorId, setOperatorId] = useState(
         () => localStorage.getItem('operator_id') || 'operator_1'
     );
@@ -89,13 +90,25 @@ function CommandDesk({
         };
 
         const onAnomaly = (payload) => {
+            const primary = payload.anomalies?.[0];
+            const explanation =
+                payload.ml_explanations?.[0]?.explanation_az ||
+                primary?.explanation_az ||
+                primary?.type ||
+                'Anomaliya';
+            setMlAlert({
+                case_id: payload.case_id,
+                text: explanation,
+                model_version: payload.model_version,
+                ts: Date.now()
+            });
             setEvents((prev) => [
                 {
                     id: `evt_anom_${Date.now()}`,
                     type: 'ai_anomaly',
                     case_id: payload.case_id,
                     ts: new Date().toISOString(),
-                    payload: { primary: payload.anomalies?.[0] }
+                    payload: { primary, ml_explanations: payload.ml_explanations }
                 },
                 ...prev
             ].slice(0, 80));
@@ -256,6 +269,18 @@ function CommandDesk({
                 {selected ? (
                     <>
                         <h2>{selected.title}</h2>
+                        {mlAlert?.case_id === selected.case_id && (
+                            <div className="command-desk__ml-alert" role="status">
+                                <strong>ML anomaliya</strong>
+                                <p>{mlAlert.text}</p>
+                                {mlAlert.model_version && (
+                                    <small>Model: {mlAlert.model_version}</small>
+                                )}
+                                <button type="button" onClick={() => setMlAlert(null)}>
+                                    Bağla
+                                </button>
+                            </div>
+                        )}
                         <SubjectIntelPanel
                             caseId={selected.case_id}
                             deviceLat={selected.lat}

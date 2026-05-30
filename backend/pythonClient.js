@@ -66,6 +66,10 @@ async function fuseAreaZone(payload) {
     return postPython('/area/fuse', payload, 15000);
 }
 
+async function runMlScore(payload) {
+    return postPython('/ml/score', payload, 5000);
+}
+
 module.exports = {
     PYTHON_API,
     runAnalyticsBatch,
@@ -73,5 +77,6 @@ module.exports = {
     checkGeofenceBatch,
     runIntelProfile,
     runRoutineZones,
-    fuseAreaZone
+    fuseAreaZone,
+    runMlScore
 };

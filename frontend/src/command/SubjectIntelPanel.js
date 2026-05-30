@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPost } from '../api';
+import { apiGet, fetchPlaceFromGps } from '../api';
 import { getTrackingSocket } from '../socketService';
 import './SubjectIntelPanel.css';
 
@@ -82,17 +82,16 @@ function SubjectIntelPanel({ caseId, deviceLat, deviceLon, deviceAccuracy }) {
             return undefined;
         }
         let cancelled = false;
-        apiPost('/api/location/resolve', {
-            latitude: deviceLat,
-            longitude: deviceLon,
-            accuracy: deviceAccuracy ?? null
-        })
+        fetchPlaceFromGps(deviceLat, deviceLon, deviceAccuracy ?? null)
             .then((r) => {
                 if (!cancelled) {
                     setLivePlace({
+                        display_line: r.display_line || '',
                         city: r.city || '',
+                        district: r.district || '',
                         country: r.country || '',
-                        region: r.region || ''
+                        region_label: r.region_label || '',
+                        source: r.source || ''
                     });
                 }
             })
@@ -107,8 +106,17 @@ function SubjectIntelPanel({ caseId, deviceLat, deviceLon, deviceAccuracy }) {
     const snap = intel?.latest?.snapshot;
     if (!caseId) return null;
 
-    const gpsCity = snap?.location?.city || livePlace?.city || '';
+    const gpsAddress =
+        snap?.location?.display_line ||
+        livePlace?.display_line ||
+        snap?.location?.city ||
+        livePlace?.city ||
+        '';
+    const gpsDistrict = snap?.location?.district || livePlace?.district || '';
+    const gpsRegionLabel =
+        snap?.location?.region_label || livePlace?.region_label || '';
     const gpsCountry = snap?.location?.country || livePlace?.country || '';
+    const geoSource = snap?.location?.geocode_source || livePlace?.source || '';
     const gpsCoords =
         snap?.location?.latitude != null
             ? `${Number(snap.location.latitude).toFixed(5)}, ${Number(snap.location.longitude).toFixed(5)}`
@@ -133,8 +141,14 @@ function SubjectIntelPanel({ caseId, deviceLat, deviceLon, deviceAccuracy }) {
             ) : (
                 <>
                     <IntelSection title="Konum (GPS — xəritə ilə eyni)">
-                        <Row label="Şəhər" value={gpsCity || 'Hələ alınmayıb'} alwaysShow />
+                        <p className="subject-intel__note">
+                            Fiziki ünvan — telefonun GPS koordinatından (dəqiq).
+                        </p>
+                        <Row label="Ünvan" value={gpsAddress || 'Hələ alınmayıb'} alwaysShow />
+                        <Row label="Rayon / məhəllə" value={gpsDistrict} />
+                        <Row label="Region" value={gpsRegionLabel} />
                         <Row label="Ölkə" value={gpsCountry} />
+                        <Row label="Mənbə" value={geoSource} />
                         <Row label="Koordinat" value={gpsCoords} />
                         <Row
                             label="Dəqiqlik"
@@ -148,10 +162,18 @@ function SubjectIntelPanel({ caseId, deviceLat, deviceLon, deviceAccuracy }) {
                         />
                     </IntelSection>
 
-                    <IntelSection title="Şəbəkə (IP təxmini)">
+                    <IntelSection title="Şəbəkə (IP — ISP təxmini, dəqiq deyil)">
+                        <p className="subject-intel__note">
+                            IP şəhəri (məs. Yevlax) operatorun çıxış nöqtəsidir; siz başqa yerdə ola
+                            bilərsiniz — etibar edin: yuxarıdakı GPS.
+                        </p>
                         <Row label="IP (lokal)" value={snap.server?.ip} />
                         <Row label="IP (public)" value={snap.public_ip || snap.server?.lookup_ip} />
-                        <Row label="Şəhər (IP)" value={snap.server?.city} alwaysShow />
+                        <Row
+                            label="Şəhər (IP/ISP)"
+                            value={snap.server?.city ? `${snap.server.city} — təxmini` : '—'}
+                            alwaysShow
+                        />
                         <Row label="Ölkə (IP)" value={snap.server?.country} />
                         <Row label="Provayder" value={snap.server?.isp} />
                         <Row label="Org" value={snap.server?.org} />

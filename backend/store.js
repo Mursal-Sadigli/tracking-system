@@ -18,6 +18,7 @@ const store = {
     visitHistory: [],
     shareLinks: new Map(),
     riskSnapshots: {},
+    mlSnapshots: {},
     anomalyRules: { global: {}, by_case: {} },
     caseBriefings: {},
     routineZones: {},
@@ -41,6 +42,7 @@ function serialize() {
         visitHistory: store.visitHistory || [],
         shareLinks: Array.from((store.shareLinks || new Map()).entries()),
         riskSnapshots: store.riskSnapshots || {},
+        mlSnapshots: store.mlSnapshots || {},
         anomalyRules: store.anomalyRules || { global: {}, by_case: {} },
         caseBriefings: store.caseBriefings || {},
         routineZones: store.routineZones || {},
@@ -65,6 +67,7 @@ function hydrate(data) {
     store.visitHistory = data.visitHistory || [];
     store.shareLinks = new Map(data.shareLinks || []);
     store.riskSnapshots = data.riskSnapshots || {};
+    store.mlSnapshots = data.mlSnapshots || {};
     store.anomalyRules = data.anomalyRules || { global: {}, by_case: {} };
     store.caseBriefings = data.caseBriefings || {};
     store.routineZones = data.routineZones || {};

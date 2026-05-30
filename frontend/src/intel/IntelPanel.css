@@ -69,3 +69,19 @@
     font-size: 0.85rem;
     color: #94a3b8;
 }
+
+.intel-panel__ml {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #334155;
+}
+
+.intel-panel__ml h4,
+.intel-panel__ml h5 {
+    margin: 0.5rem 0 0.35rem;
+    font-size: 0.9rem;
+}
+
+.intel-panel__ml ul {
+    color: #cbd5e1;
+}

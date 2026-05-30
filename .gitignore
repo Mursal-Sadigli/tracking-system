@@ -4,6 +4,7 @@ backend/node_modules/
 backend/data/store.json
 backend/data/media/
 python-service/venv/
+python-service/data/ml/
 .env
 frontend/.env
 *.log

@@ -1,6 +1,6 @@
 import { getDeviceInfo, getNetworkInfo } from './deviceInfo';
 import { isSecureLocationContext, GPS_OPTIONS } from './geolocation';
-import { resolveLocationApi } from './api';
+import { fetchPlaceFromGps } from './api';
 
 function guessRegionFromClient() {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -89,14 +89,19 @@ function getGpsLocationPlace() {
                 const longitude = pos.coords.longitude;
                 const accuracy = pos.coords.accuracy;
                 try {
-                    const resolved = await resolveLocationApi(latitude, longitude, accuracy);
+                    const place = await fetchPlaceFromGps(latitude, longitude, accuracy);
                     resolve({
                         latitude,
                         longitude,
                         accuracy,
-                        city: resolved.city || '',
-                        country: resolved.country || '',
-                        region: resolved.region || '',
+                        display_line: place.display_line || '',
+                        city: place.city || '',
+                        district: place.district || '',
+                        suburb: place.suburb || '',
+                        country: place.country || '',
+                        region_key: place.region_key || '',
+                        region_label: place.region_label || '',
+                        geocode_source: place.source || 'gps',
                         source: 'gps'
                     });
                 } catch {
@@ -104,6 +109,7 @@ function getGpsLocationPlace() {
                         latitude,
                         longitude,
                         accuracy,
+                        display_line: '',
                         city: '',
                         country: '',
                         source: 'gps_coords_only'

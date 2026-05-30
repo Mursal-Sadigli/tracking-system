@@ -1,5 +1,7 @@
-const { runAnalyticsBatch } = require('./pythonClient');
+const { runAnalyticsBatch, runMlScore } = require('./pythonClient');
 const { getRulesForCase } = require('./anomalyRules');
+
+const ML_ENABLED = process.env.ML_ENABLED !== 'false';
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
     const R = 6371000;
@@ -54,11 +56,69 @@ function detectLocalAnomalies(history, speedKmh, rules) {
     return anomalies;
 }
 
-async function detectAnomalies(history, speedKmh, caseId) {
+function mergeAnomalies(local, fromMl) {
+    const merged = [...local];
+    for (const p of fromMl) {
+        if (!merged.some((m) => m.type === p.type)) merged.push(p);
+    }
+    return merged;
+}
+
+function buildMlContext(rules, mlContext = {}) {
+    return {
+        in_corridor: mlContext.in_corridor !== false,
+        deviation_score: mlContext.deviation_score ?? 0,
+        speed_limit_kmh: mlContext.speed_limit_kmh ?? rules.speed_limit_kmh ?? 80,
+        teleport_distance_m: rules.teleport_distance_m ?? 3000,
+        teleport_max_seconds: rules.teleport_max_seconds ?? 90,
+        accuracy_max_m: rules.accuracy_max_m ?? 250,
+        recent_event_types: mlContext.recent_event_types || []
+    };
+}
+
+async function runMlAnomalyScore({ deviceId, caseId, history, mlContext }) {
+    if (!ML_ENABLED || !deviceId || history.length < 1) return null;
+    const rules = getRulesForCase(caseId);
+    const context = buildMlContext(rules, mlContext);
+    const last = history[history.length - 1];
+    try {
+        return await runMlScore({
+            device_id: deviceId,
+            case_id: caseId,
+            history,
+            current: last,
+            context
+        });
+    } catch {
+        return null;
+    }
+}
+
+async function detectAnomalies(history, speedKmh, caseId, mlContext = {}) {
     const rules = getRulesForCase(caseId);
     const speedLimit = rules.speed_limit_kmh ?? 80;
     const local = detectLocalAnomalies(history, speedKmh, rules);
-    if (history.length < 8) return local;
+
+    const deviceId = mlContext.device_id;
+    const mlResult = await runMlAnomalyScore({
+        deviceId,
+        caseId,
+        history,
+        mlContext: { ...mlContext, speed_limit_kmh: speedLimit }
+    });
+
+    if (mlResult?.anomalies?.length) {
+        const fromMl = mlResult.anomalies.map((a) => ({
+            type: a.type,
+            severity: a.severity || 'medium',
+            explanation_az: a.explanation_az || `Anomaliya: ${a.type}`,
+            value: a.value,
+            score: a.score
+        }));
+        return { anomalies: mergeAnomalies(local, fromMl), mlResult };
+    }
+
+    if (history.length < 8) return { anomalies: local, mlResult };
 
     try {
         const batch = await runAnalyticsBatch(history, { speed_limit_kmh: speedLimit });
@@ -68,14 +128,15 @@ async function detectAnomalies(history, speedKmh, caseId) {
             explanation_az: a.explanation_az || `Anomaliya: ${a.type}`,
             value: a.value
         }));
-        const merged = [...local];
-        for (const p of fromPy) {
-            if (!merged.some((m) => m.type === p.type)) merged.push(p);
-        }
-        return merged;
+        return { anomalies: mergeAnomalies(local, fromPy), mlResult };
     } catch {
-        return local;
+        return { anomalies: local, mlResult };
     }
 }
 
-module.exports = { detectAnomalies, detectLocalAnomalies };
+module.exports = {
+    detectAnomalies,
+    detectLocalAnomalies,
+    runMlAnomalyScore,
+    ML_ENABLED
+};

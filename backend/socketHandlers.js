@@ -176,19 +176,23 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
 
             const clientIpForResolve = pickClientIpForResolve(data.public_ip, socket.clientIp);
             let resolvedGeo = null;
-            if (clientIpForResolve || socket.subjectCaseId) {
+            const trustGps = Boolean(socket.subjectCaseId);
+            if (clientIpForResolve || trustGps) {
                 try {
                     resolvedGeo = await resolveLocationWithPython(
                         latitude,
                         longitude,
                         accuracy,
                         clientIpForResolve,
-                        data.hint_region
+                        data.hint_region,
+                        { trustBrowserGps: trustGps }
                     );
-                    latitude = resolvedGeo.latitude;
-                    longitude = resolvedGeo.longitude;
-                    if (resolvedGeo.accuracy != null) accuracy = resolvedGeo.accuracy;
-                    if (resolvedGeo.location_quality) location_quality = resolvedGeo.location_quality;
+                    if (!trustGps) {
+                        latitude = resolvedGeo.latitude;
+                        longitude = resolvedGeo.longitude;
+                        if (resolvedGeo.accuracy != null) accuracy = resolvedGeo.accuracy;
+                        if (resolvedGeo.location_quality) location_quality = resolvedGeo.location_quality;
+                    }
                 } catch {
                     /* brauzer koordinatı */
                 }
@@ -196,9 +200,13 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
 
             if (caseRecord?.case_id && socket.subjectCaseId) {
                 const entry = await subjectIntel.patchCaseLocation(caseRecord.case_id, latitude, longitude, {
-                    city: resolvedGeo?.city || '',
+                    display_line: resolvedGeo?.display_line || resolvedGeo?.city || '',
+                    city: resolvedGeo?.browser_city || resolvedGeo?.city || '',
+                    district: resolvedGeo?.district || '',
                     country: resolvedGeo?.country || '',
                     region: resolvedGeo?.region || '',
+                    region_label: resolvedGeo?.region_label || '',
+                    geocode_source: resolvedGeo?.geocode_source || resolvedGeo?.source,
                     accuracy
                 });
                 if (entry) {
@@ -258,7 +266,26 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
 
             const rules = getRulesForCase(caseRecord?.case_id);
             const speedLimit = caseRecord?.speed_limit_kmh || rules.speed_limit_kmh || 80;
-            const anomalies = await detectAnomalies(history, speedKmh, caseRecord?.case_id);
+
+            const deviationForMl = caseRecord
+                ? mission.computeDeviation(latitude, longitude, caseRecord.case_id)
+                : null;
+            const mlContext = {
+                device_id: device_id,
+                in_corridor: deviationForMl?.in_corridor !== false,
+                deviation_score: deviationForMl?.deviation_score ?? 0,
+                speed_limit_kmh: speedLimit
+            };
+
+            const anomalyResult = await detectAnomalies(
+                history,
+                speedKmh,
+                caseRecord?.case_id,
+                mlContext
+            );
+            const anomalies = anomalyResult.anomalies || [];
+            const mlResult = anomalyResult.mlResult || null;
+
             if (anomalies.length && caseRecord) {
                 const key = `${device_id}_${anomalies[0].type}`;
                 const last = lastAnomalyEmit.get(key) || 0;
@@ -268,12 +295,14 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
                         type: 'ai_anomaly',
                         case_id: caseRecord.case_id,
                         device_id,
-                        payload: { anomalies, primary: anomalies[0] }
+                        payload: { anomalies, primary: anomalies[0], ml_explanations: mlResult?.explanations || [] }
                     });
                     io.emit('ai_anomaly_alert', {
                         device_id,
                         case_id: caseRecord.case_id,
-                        anomalies
+                        anomalies,
+                        ml_explanations: mlResult?.explanations || [],
+                        model_version: mlResult?.model_version || null
                     });
                     if (triggerBriefing) {
                         triggerBriefing(caseRecord.case_id, 'anomaly').catch(() => {});
@@ -282,7 +311,7 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
             }
 
             if (caseRecord) {
-                await maybeUpdateRisk(io, caseRecord.case_id, device_id, history);
+                await maybeUpdateRisk(io, caseRecord.case_id, device_id, history, mlContext, mlResult);
                 updateSubjectPosition(device_id, latitude, longitude, caseRecord.case_id);
 
                 const gfState = geofenceStateByDevice.get(device_id) || {};

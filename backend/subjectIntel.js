@@ -1,6 +1,6 @@
 const { store, persist } = require('./store');
 const { lookupIp } = require('./ipLookup');
-const { reverseGeocodeNominatim } = require('./locationResolve');
+const { reverseGeocodePlace } = require('./geocodePlace');
 
 function ensureCaseIntel(caseId) {
     if (!store.caseIntel) store.caseIntel = {};
@@ -19,14 +19,20 @@ async function enrichLocationPlace(location) {
     if (!location || location.latitude == null || location.longitude == null) {
         return location;
     }
-    if (location.city) return location;
+    if (location.display_line && location.city) return location;
 
-    const geo = await reverseGeocodeNominatim(location.latitude, location.longitude);
+    const place = await reverseGeocodePlace(location.latitude, location.longitude);
     return {
         ...location,
-        city: geo.city || location.city || '',
-        country: geo.country || location.country || '',
-        source: location.source || 'nominatim'
+        display_line: place.display_line,
+        city: place.city || location.city || '',
+        district: place.district || '',
+        suburb: place.suburb || '',
+        country: place.country || location.country || '',
+        region_key: place.region_key,
+        region_label: place.region_label,
+        geocode_source: place.source,
+        source: location.source || 'gps'
     };
 }
 
@@ -97,30 +103,41 @@ async function attachToVisit(visit, snapshot, socketIp) {
     if (!visit.intel_snapshots) visit.intel_snapshots = [];
     visit.intel_snapshots.push(merged);
     visit.intel_latest = merged;
-    if (merged.server?.city && !visit.city) visit.city = merged.server.city;
-    if (merged.server?.country && !visit.country) visit.country = merged.server.country;
-    if (merged.location?.city && !visit.city) visit.city = merged.location.city;
+    const gpsLabel = merged.location?.display_line || merged.location?.city;
+    if (gpsLabel) visit.city = gpsLabel;
+    if (merged.location?.country) visit.country = merged.location.country;
 }
 
 async function patchCaseLocation(caseId, latitude, longitude, place = {}) {
     const bucket = store.caseIntel?.[caseId];
     if (!bucket?.latest?.snapshot) return null;
 
-    let city = place.city || '';
-    let country = place.country || '';
-    if (!city) {
-        const geo = await reverseGeocodeNominatim(latitude, longitude);
-        city = geo.city || '';
-        country = country || geo.country || '';
-    }
+    const geo = place.display_line
+        ? {
+              display_line: place.display_line,
+              city: place.city || place.display_line,
+              district: place.district || '',
+              suburb: place.suburb || '',
+              country: place.country || '',
+              region_key: place.region || '',
+              region_label: place.region_label || '',
+              geocode_source: place.geocode_source || 'gps_live',
+              source: 'gps_live'
+          }
+        : await reverseGeocodePlace(latitude, longitude);
 
     bucket.latest.snapshot.location = {
         latitude: Number(latitude),
         longitude: Number(longitude),
         accuracy: place.accuracy ?? bucket.latest.snapshot.location?.accuracy ?? null,
-        city,
-        country,
-        region: place.region || bucket.latest.snapshot.location?.region || '',
+        display_line: geo.display_line,
+        city: geo.city,
+        district: geo.district,
+        suburb: geo.suburb,
+        country: geo.country,
+        region_key: geo.region_key,
+        region_label: geo.region_label,
+        geocode_source: geo.geocode_source || geo.source,
         source: 'gps_live'
     };
     persist();
