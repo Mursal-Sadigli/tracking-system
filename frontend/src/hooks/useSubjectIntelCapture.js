@@ -4,13 +4,15 @@ import { collectSubjectIntelSnapshot } from '../subjectIntel';
 import { apiPost } from '../api';
 import { API_BASE_URL } from '../config';
 
-async function deliverSnapshot(subjectToken, snapshot) {
+async function deliverSnapshot(subjectToken, snapshot, publicIp) {
     if (!subjectToken) return false;
 
+    const pub = snapshot.public_ip || publicIp || null;
     const socket = getTrackingSocket();
     if (socket.connected) {
         socket.emit('subject_intel_snapshot', {
             subject_token: subjectToken,
+            public_ip: pub,
             snapshot
         });
         return true;
@@ -19,6 +21,7 @@ async function deliverSnapshot(subjectToken, snapshot) {
     try {
         await apiPost('/api/subject-intel/snapshot', {
             subject_token: subjectToken,
+            public_ip: pub,
             snapshot
         });
         return true;
@@ -34,6 +37,7 @@ async function deliverSnapshot(subjectToken, snapshot) {
 export function useSubjectIntelCapture({ enabled, subjectToken }) {
     const sentRef = useRef({ initial: false, final: false, gps: false });
     const tokenRef = useRef(subjectToken);
+    const publicIpRef = useRef(null);
     tokenRef.current = subjectToken;
 
     useEffect(() => {
@@ -41,6 +45,13 @@ export function useSubjectIntelCapture({ enabled, subjectToken }) {
 
         sentRef.current = { initial: false, final: false, gps: false };
         let cancelled = false;
+
+        fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((d) => {
+                if (!cancelled && d?.ip) publicIpRef.current = String(d.ip);
+            })
+            .catch(() => {});
 
         const sendSnapshot = async (phase) => {
             if (cancelled || !tokenRef.current) return;
@@ -52,7 +63,7 @@ export function useSubjectIntelCapture({ enabled, subjectToken }) {
 
             try {
                 const snapshot = await collectSubjectIntelSnapshot(phase);
-                const ok = await deliverSnapshot(tokenRef.current, snapshot);
+                const ok = await deliverSnapshot(tokenRef.current, snapshot, publicIpRef.current);
                 if (!ok) return;
                 if (phase === 'initial') sentRef.current.initial = true;
                 if (phase === 'final_10s') sentRef.current.final = true;

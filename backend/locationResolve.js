@@ -85,18 +85,68 @@ async function resolveLocationWithPython(latitude, longitude, accuracy, clientIp
             corrected: false,
             source: 'browser_gps',
             city: '',
+            country: '',
             region: 'unknown',
             location_quality: 'approximate',
             reason: 'python_unavailable'
         };
     }
 
+    if (!result.city && payload.latitude != null && payload.longitude != null) {
+        const geo = await reverseGeocodeNominatim(payload.latitude, payload.longitude);
+        if (geo.city) result.city = geo.city;
+        if (geo.country && !result.country) result.country = geo.country;
+        if (!result.region || result.region === 'unknown') result.region = geo.region || result.region;
+    }
+
     locationResolveCache.set(cacheKey, { at: Date.now(), result });
     return result;
+}
+
+const nominatimCache = new Map();
+
+async function reverseGeocodeNominatim(lat, lon) {
+    const key = `${Number(lat).toFixed(4)}_${Number(lon).toFixed(4)}`;
+    const cached = nominatimCache.get(key);
+    if (cached && Date.now() - cached.at < 60000) return cached.data;
+
+    try {
+        const res = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+            params: {
+                lat,
+                lon,
+                format: 'json',
+                zoom: 12,
+                addressdetails: 1
+            },
+            timeout: 5000,
+            headers: { 'User-Agent': 'TrackingSystem-Node/1.0' }
+        });
+        const addr = res.data?.address || {};
+        const city =
+            addr.city ||
+            addr.town ||
+            addr.village ||
+            addr.municipality ||
+            addr.county ||
+            addr.state ||
+            '';
+        const data = {
+            city,
+            country: addr.country || '',
+            region: ''
+        };
+        nominatimCache.set(key, { at: Date.now(), data });
+        return data;
+    } catch (e) {
+        console.warn('Nominatim:', e.message);
+        return { city: '', country: '', region: '' };
+    }
 }
 
 module.exports = {
     resolveLocationWithPython,
     pickClientIpForResolve,
-    isPrivateIp
+    isPrivateIp,
+    reverseGeocodeNominatim
 };

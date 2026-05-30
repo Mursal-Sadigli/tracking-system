@@ -52,6 +52,16 @@ async function readPermissionStates() {
     return out;
 }
 
+async function getClientPublicIp() {
+    try {
+        const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+        const data = await res.json();
+        return data?.ip ? String(data.ip) : null;
+    } catch {
+        return null;
+    }
+}
+
 async function getStorageEstimate() {
     if (!navigator.storage?.estimate) return null;
     try {
@@ -116,11 +126,13 @@ export async function collectSubjectIntelSnapshot(phase = 'initial') {
     const region = guessRegionFromClient();
     const permissions = await readPermissionStates();
     const storage = await getStorageEstimate();
+    const public_ip = await getClientPublicIp();
     const location = await getGpsLocationPlace();
 
     return {
         phase,
         collected_at: new Date().toISOString(),
+        public_ip,
         secure_context: isSecureLocationContext(),
         device: {
             ...base,

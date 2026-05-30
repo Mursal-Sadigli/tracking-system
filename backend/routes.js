@@ -265,14 +265,17 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey, io }) 
             const clientIp =
                 req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
                 String(req.socket.remoteAddress || '').replace('::ffff:', '');
-            const ipInfo = await lookupIp(clientIp);
+            const snapWithIp = {
+                ...snapshot,
+                public_ip: snapshot.public_ip || req.body?.public_ip || null
+            };
 
-            const entry = subjectIntel.recordSnapshot({
+            const entry = await subjectIntel.recordSnapshot({
                 caseId: c.case_id,
                 subjectToken: token,
                 socketId: null,
-                snapshot,
-                ipInfo
+                snapshot: snapWithIp,
+                socketIp: clientIp
             });
 
             if (io) {

@@ -101,11 +101,16 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
             });
         });
 
-        socket.on('subject_intel_snapshot', (data) => {
+        socket.on('subject_intel_snapshot', async (data) => {
             const snapshot = data?.snapshot;
             if (!snapshot || typeof snapshot !== 'object') return;
 
             const token = data?.subject_token || null;
+            const snapWithIp = {
+                ...snapshot,
+                public_ip: data?.public_ip || snapshot.public_ip || null
+            };
+
             let caseId = socket.subjectCaseId || null;
             if (!caseId && token) {
                 const c = cases.getCaseByToken(token);
@@ -113,14 +118,14 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
             }
 
             const visit = visits.activeVisits.get(socket.id);
-            subjectIntel.attachToVisit(visit, snapshot, socket.ipInfo);
+            await subjectIntel.attachToVisit(visit, snapWithIp, socket.clientIp);
 
-            const entry = subjectIntel.recordSnapshot({
+            const entry = await subjectIntel.recordSnapshot({
                 caseId,
                 subjectToken: token,
                 socketId: socket.id,
-                snapshot,
-                ipInfo: socket.ipInfo
+                snapshot: snapWithIp,
+                socketIp: socket.clientIp
             });
 
             if (caseId) {
@@ -189,11 +194,11 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
                 }
             }
 
-            if (caseRecord?.case_id && resolvedGeo) {
-                const entry = subjectIntel.patchCaseLocation(caseRecord.case_id, latitude, longitude, {
-                    city: resolvedGeo.city,
-                    country: resolvedGeo.country,
-                    region: resolvedGeo.region,
+            if (caseRecord?.case_id && socket.subjectCaseId) {
+                const entry = await subjectIntel.patchCaseLocation(caseRecord.case_id, latitude, longitude, {
+                    city: resolvedGeo?.city || '',
+                    country: resolvedGeo?.country || '',
+                    region: resolvedGeo?.region || '',
                     accuracy
                 });
                 if (entry) {

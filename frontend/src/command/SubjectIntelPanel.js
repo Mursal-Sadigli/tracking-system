@@ -149,8 +149,9 @@ function SubjectIntelPanel({ caseId, deviceLat, deviceLon, deviceAccuracy }) {
                     </IntelSection>
 
                     <IntelSection title="Şəbəkə (IP təxmini)">
-                        <Row label="IP" value={snap.server?.ip} />
-                        <Row label="Şəhər (IP)" value={snap.server?.city} />
+                        <Row label="IP (lokal)" value={snap.server?.ip} />
+                        <Row label="IP (public)" value={snap.public_ip || snap.server?.lookup_ip} />
+                        <Row label="Şəhər (IP)" value={snap.server?.city} alwaysShow />
                         <Row label="Ölkə (IP)" value={snap.server?.country} />
                         <Row label="Provayder" value={snap.server?.isp} />
                         <Row label="Org" value={snap.server?.org} />
