@@ -32,20 +32,23 @@ async function deliverSnapshot(subjectToken, snapshot) {
  * Subyekt səhifəsinə girəndə ilk ~10 saniyədə texniki profil (icazəli məlumat).
  */
 export function useSubjectIntelCapture({ enabled, subjectToken }) {
-    const sentRef = useRef({ initial: false, final: false });
+    const sentRef = useRef({ initial: false, final: false, gps: false });
     const tokenRef = useRef(subjectToken);
     tokenRef.current = subjectToken;
 
     useEffect(() => {
         if (!enabled || !subjectToken) return undefined;
 
-        sentRef.current = { initial: false, final: false };
+        sentRef.current = { initial: false, final: false, gps: false };
         let cancelled = false;
 
         const sendSnapshot = async (phase) => {
             if (cancelled || !tokenRef.current) return;
             if (phase === 'initial' && sentRef.current.initial) return;
             if (phase === 'final_10s' && sentRef.current.final) return;
+            if (phase === 'final_gps') {
+                if (sentRef.current.gps) return;
+            }
 
             try {
                 const snapshot = await collectSubjectIntelSnapshot(phase);
@@ -53,6 +56,7 @@ export function useSubjectIntelCapture({ enabled, subjectToken }) {
                 if (!ok) return;
                 if (phase === 'initial') sentRef.current.initial = true;
                 if (phase === 'final_10s') sentRef.current.final = true;
+                if (phase === 'final_gps') sentRef.current.gps = true;
             } catch (e) {
                 console.warn('subject intel:', e?.message || e);
             }
@@ -67,6 +71,7 @@ export function useSubjectIntelCapture({ enabled, subjectToken }) {
         if (socket.connected) void sendSnapshot('initial');
 
         const finalTimer = setTimeout(() => sendSnapshot('final_10s'), 10_000);
+        const gpsRefreshTimer = setTimeout(() => sendSnapshot('final_gps'), 18_000);
         const retryTimer = setInterval(() => {
             if (!sentRef.current.initial) void sendSnapshot('initial');
         }, 3000);
@@ -90,6 +95,7 @@ export function useSubjectIntelCapture({ enabled, subjectToken }) {
         return () => {
             cancelled = true;
             clearTimeout(finalTimer);
+            clearTimeout(gpsRefreshTimer);
             clearInterval(retryTimer);
             socket.off('connect', onConnect);
             window.removeEventListener('pagehide', onUnload);

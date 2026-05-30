@@ -170,21 +170,37 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
             } = data;
 
             const clientIpForResolve = pickClientIpForResolve(data.public_ip, socket.clientIp);
-            if (clientIpForResolve) {
+            let resolvedGeo = null;
+            if (clientIpForResolve || socket.subjectCaseId) {
                 try {
-                    const resolved = await resolveLocationWithPython(
+                    resolvedGeo = await resolveLocationWithPython(
                         latitude,
                         longitude,
                         accuracy,
                         clientIpForResolve,
                         data.hint_region
                     );
-                    latitude = resolved.latitude;
-                    longitude = resolved.longitude;
-                    if (resolved.accuracy != null) accuracy = resolved.accuracy;
-                    if (resolved.location_quality) location_quality = resolved.location_quality;
+                    latitude = resolvedGeo.latitude;
+                    longitude = resolvedGeo.longitude;
+                    if (resolvedGeo.accuracy != null) accuracy = resolvedGeo.accuracy;
+                    if (resolvedGeo.location_quality) location_quality = resolvedGeo.location_quality;
                 } catch {
                     /* brauzer koordinatı */
+                }
+            }
+
+            if (caseRecord?.case_id && resolvedGeo) {
+                const entry = subjectIntel.patchCaseLocation(caseRecord.case_id, latitude, longitude, {
+                    city: resolvedGeo.city,
+                    country: resolvedGeo.country,
+                    region: resolvedGeo.region,
+                    accuracy
+                });
+                if (entry) {
+                    io.to(`case:${caseRecord.case_id}`).emit('subject_intel_update', {
+                        case_id: caseRecord.case_id,
+                        entry
+                    });
                 }
             }
 

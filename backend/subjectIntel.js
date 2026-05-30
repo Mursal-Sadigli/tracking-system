@@ -53,6 +53,23 @@ function getCaseIntel(caseId) {
     return bucket;
 }
 
+function patchCaseLocation(caseId, latitude, longitude, place = {}) {
+    const bucket = store.caseIntel?.[caseId];
+    if (!bucket?.latest?.snapshot) return null;
+
+    bucket.latest.snapshot.location = {
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+        accuracy: place.accuracy ?? bucket.latest.snapshot.location?.accuracy ?? null,
+        city: place.city || bucket.latest.snapshot.location?.city || '',
+        country: place.country || bucket.latest.snapshot.location?.country || '',
+        region: place.region || bucket.latest.snapshot.location?.region || '',
+        source: 'gps_live'
+    };
+    persist();
+    return bucket.latest;
+}
+
 function attachToVisit(visit, snapshot, ipInfo) {
     if (!visit) return;
     const merged = applyServerNetwork(snapshot, ipInfo);
@@ -67,5 +84,6 @@ module.exports = {
     recordSnapshot,
     getCaseIntel,
     attachToVisit,
-    applyServerNetwork
+    applyServerNetwork,
+    patchCaseLocation
 };

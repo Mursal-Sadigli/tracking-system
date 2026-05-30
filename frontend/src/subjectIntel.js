@@ -1,11 +1,12 @@
 import { getDeviceInfo, getNetworkInfo } from './deviceInfo';
-import { isSecureLocationContext } from './geolocation';
+import { isSecureLocationContext, GPS_OPTIONS } from './geolocation';
+import { resolveLocationApi } from './api';
 
 function guessRegionFromClient() {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
     const lang = (navigator.language || '').toLowerCase();
     if (tz === 'Asia/Baku' || lang.startsWith('az')) {
-        return { country: 'Azərbaycan', city: 'Bakı (saat qurşağı təxmini)', source: 'timezone_lang' };
+        return { country: 'Azərbaycan', city: '', source: 'timezone_lang' };
     }
     if (lang.startsWith('tr')) {
         return { country: 'Türkiyə (təxmini)', city: '', source: 'language' };
@@ -51,6 +52,60 @@ async function readPermissionStates() {
     return out;
 }
 
+async function getStorageEstimate() {
+    if (!navigator.storage?.estimate) return null;
+    try {
+        const { quota, usage } = await navigator.storage.estimate();
+        return {
+            usage_bytes: usage ?? null,
+            quota_bytes: quota ?? null,
+            usage_mb: usage != null ? Math.round(usage / 1024 / 1024) : null,
+            quota_mb: quota != null ? Math.round(quota / 1024 / 1024) : null
+        };
+    } catch {
+        return null;
+    }
+}
+
+function getGpsLocationPlace() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            resolve(null);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const latitude = pos.coords.latitude;
+                const longitude = pos.coords.longitude;
+                const accuracy = pos.coords.accuracy;
+                try {
+                    const resolved = await resolveLocationApi(latitude, longitude, accuracy);
+                    resolve({
+                        latitude,
+                        longitude,
+                        accuracy,
+                        city: resolved.city || '',
+                        country: resolved.country || '',
+                        region: resolved.region || '',
+                        source: 'gps'
+                    });
+                } catch {
+                    resolve({
+                        latitude,
+                        longitude,
+                        accuracy,
+                        city: '',
+                        country: '',
+                        source: 'gps_coords_only'
+                    });
+                }
+            },
+            () => resolve(null),
+            { ...GPS_OPTIONS, timeout: 12000, maximumAge: 120000 }
+        );
+    });
+}
+
 /**
  * Şəffaf, icazəli texniki profil (spyware deyil).
  */
@@ -60,6 +115,8 @@ export async function collectSubjectIntelSnapshot(phase = 'initial') {
     const browserVer = parseBrowserVersion(base.user_agent || '');
     const region = guessRegionFromClient();
     const permissions = await readPermissionStates();
+    const storage = await getStorageEstimate();
+    const location = await getGpsLocationPlace();
 
     return {
         phase,
@@ -74,8 +131,11 @@ export async function collectSubjectIntelSnapshot(phase = 'initial') {
             hardware_concurrency: navigator.hardwareConcurrency ?? null,
             max_touch_points: navigator.maxTouchPoints ?? null,
             device_memory_gb: navigator.deviceMemory ?? null,
+            device_memory_supported: navigator.deviceMemory != null,
             languages: [...(navigator.languages || [base.language])]
         },
+        storage,
+        location,
         screen: {
             width: window.screen?.width ?? null,
             height: window.screen?.height ?? null,
