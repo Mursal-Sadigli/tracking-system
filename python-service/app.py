@@ -15,6 +15,7 @@ from briefing_generator import generate_briefing
 from geofence_engine import batch_check
 from intel_engine import build_profile, build_routine_clusters
 from location_resolver import resolve_location
+from area_fusion import fuse_area_zone
 
 app = FastAPI(title="Tracking Python API", version="2.0.0")
 
@@ -55,6 +56,17 @@ class GeofenceBody(BaseModel):
 
 class IntelBody(BaseModel):
     history: List[Dict[str, Any]] = []
+
+
+class AreaFuseBody(BaseModel):
+    zone_id: Optional[str] = None
+    zone_name: Optional[str] = None
+    polygon: List[Dict[str, float]] = []
+    subjects: List[Dict[str, Any]] = []
+    traffic_segments: List[Dict[str, Any]] = []
+    foot_points: List[Dict[str, Any]] = []
+    external_devices: List[Dict[str, Any]] = []
+    providers: Dict[str, Any] = {}
 
 
 @app.get("/health")
@@ -102,6 +114,27 @@ def post_intel_profile(body: IntelBody):
 @app.post("/intel/routine-zones")
 def post_routine_zones(body: IntelBody):
     return build_routine_clusters(body.history)
+
+
+@app.post("/area/fuse")
+def post_area_fuse(body: AreaFuseBody):
+    return fuse_area_zone(body.model_dump())
+
+
+@app.post("/area/briefing")
+def post_area_briefing(body: AreaFuseBody):
+    from area_fusion import generate_zone_briefing
+
+    return {
+        "briefing": generate_zone_briefing(
+            body.zone_name or body.zone_id,
+            body.subjects,
+            body.traffic_segments,
+            body.foot_points,
+            body.external_devices,
+            body.providers,
+        )
+    }
 
 
 if __name__ == "__main__":

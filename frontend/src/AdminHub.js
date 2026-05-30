@@ -4,11 +4,12 @@ import CommandDesk from './command/CommandDesk';
 import MissionPanel from './mission/MissionPanel';
 import IntelPanel from './intel/IntelPanel';
 import MediaGalleryPage from './media/MediaGalleryPage';
+import ZoneWatchPage from './zone/ZoneWatchPage';
 import { COMMAND_PATH } from './config';
 import './AdminHub.css';
 
 function AdminHub({ onConnectionChange }) {
-    const [tab, setTab] = useState('map');
+    const [tab, setTab] = useState('command');
     const [selectedCaseId, setSelectedCaseId] = useState(null);
     const [routineZones, setRoutineZones] = useState([]);
     const [mediaBadge, setMediaBadge] = useState(0);
@@ -62,6 +63,13 @@ function AdminHub({ onConnectionChange }) {
                 >
                     Analitika
                 </button>
+                <button
+                    type="button"
+                    className={tab === 'area' ? 'is-active' : ''}
+                    onClick={() => setTab('area')}
+                >
+                    Ərazi
+                </button>
                 <a className="admin-hub__wall-link" href={`${COMMAND_PATH}/wall`} target="_blank" rel="noreferrer">
                     Divar rejimi
                 </a>
@@ -86,6 +94,7 @@ function AdminHub({ onConnectionChange }) {
             {tab === 'intel' && (
                 <IntelPanel selectedCaseId={selectedCaseId} onRoutineZones={setRoutineZones} />
             )}
+            {tab === 'area' && <ZoneWatchPage />}
         </div>
     );
 }

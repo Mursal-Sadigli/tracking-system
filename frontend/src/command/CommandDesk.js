@@ -7,6 +7,7 @@ import LinkGenerator from './LinkGenerator';
 import VisitHistory from './VisitHistory';
 import ShareLinkButton from './ShareLinkButton';
 import SubjectMediaPanel from './SubjectMediaPanel';
+import SubjectIntelPanel from './SubjectIntelPanel';
 import RiskBadge from '../intel/RiskBadge';
 import './CommandDesk.css';
 
@@ -255,6 +256,7 @@ function CommandDesk({
                 {selected ? (
                     <>
                         <h2>{selected.title}</h2>
+                        <SubjectIntelPanel caseId={selected.case_id} />
                         <p className="command-desk__meta">Cihaz: {selected.device_id}</p>
                         {selected.lat != null && (
                             <p className="command-desk__meta">

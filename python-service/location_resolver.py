@@ -129,10 +129,32 @@ def get_public_ip() -> Optional[str]:
     return None
 
 
+def is_private_ip(ip: str) -> bool:
+    raw = (ip or "").strip().lower().replace("::ffff:", "")
+    if not raw or raw in ("127.0.0.1", "::1", "localhost", "0.0.0.0"):
+        return True
+    parts = raw.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        a, b = int(parts[0]), int(parts[1])
+    except ValueError:
+        return False
+    if a == 10:
+        return True
+    if a == 172 and 16 <= b <= 31:
+        return True
+    if a == 192 and b == 168:
+        return True
+    return False
+
+
 def get_ip_location(client_ip: Optional[str]) -> Optional[Dict[str, Any]]:
     ip = (client_ip or "").strip()
     if not ip or ip in ("127.0.0.1", "::1", "localhost", "0.0.0.0"):
         ip = get_public_ip()
+    elif is_private_ip(ip):
+        return None
     if not ip:
         return None
 

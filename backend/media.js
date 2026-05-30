@@ -21,12 +21,18 @@ function saveMediaFile(caseId, type, buffer, mime) {
     let ext = 'jpg';
     if (type === 'video') {
         ext = mime && mime.includes('mp4') ? 'mp4' : 'webm';
+    } else if (type === 'audio') {
+        if (mime && mime.includes('ogg')) ext = 'ogg';
+        else if (mime && mime.includes('mp4')) ext = 'm4a';
+        else ext = 'webm';
     }
     const filename = `${id}.${ext}`;
     const dir = ensureCaseDir(caseId);
     const fullPath = path.join(dir, filename);
     fs.writeFileSync(fullPath, buffer);
-    return { id, filename, fullPath, mime: mime || (type === 'video' ? 'video/webm' : 'image/jpeg') };
+    const defaultMime =
+        type === 'video' ? 'video/webm' : type === 'audio' ? 'audio/webm' : 'image/jpeg';
+    return { id, filename, fullPath, mime: mime || defaultMime };
 }
 
 function addRecord(record) {
@@ -52,6 +58,40 @@ function listByCase(caseId, limit = 50) {
 
 function listRecent(limit = 50) {
     return (store.mediaRecords || []).slice(-limit).reverse();
+}
+
+function deleteById(mediaId) {
+    const idx = (store.mediaRecords || []).findIndex((r) => r.id === mediaId);
+    if (idx < 0) return null;
+    const [rec] = store.mediaRecords.splice(idx, 1);
+    try {
+        if (rec.full_path && fs.existsSync(rec.full_path)) fs.unlinkSync(rec.full_path);
+    } catch {
+        /* ignore */
+    }
+    persist();
+    return rec;
+}
+
+function deleteByIds(mediaIds) {
+    const idSet = new Set(Array.isArray(mediaIds) ? mediaIds : []);
+    const removed = [];
+    const kept = [];
+    for (const r of store.mediaRecords || []) {
+        if (idSet.has(r.id)) {
+            try {
+                if (r.full_path && fs.existsSync(r.full_path)) fs.unlinkSync(r.full_path);
+            } catch {
+                /* ignore */
+            }
+            removed.push(r);
+        } else {
+            kept.push(r);
+        }
+    }
+    store.mediaRecords = kept;
+    if (removed.length) persist();
+    return removed;
 }
 
 function deleteOlderThan(days) {
@@ -83,5 +123,7 @@ module.exports = {
     getById,
     listByCase,
     listRecent,
-    deleteOlderThan
+    deleteOlderThan,
+    deleteById,
+    deleteByIds
 };

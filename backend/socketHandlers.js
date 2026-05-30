@@ -11,6 +11,9 @@ const { lookupIp } = require('./ipLookup');
 const { detectAnomalies } = require('./anomalyDetector');
 const { maybeUpdateRisk } = require('./riskService');
 const { getRulesForCase } = require('./anomalyRules');
+const { broadcastSubjectPresence } = require('./areaWatchWorker');
+const { resolveLocationWithPython, pickClientIpForResolve } = require('./locationResolve');
+const subjectIntel = require('./subjectIntel');
 
 const geofenceStateByDevice = new Map();
 const missionDwellByCase = new Map();
@@ -34,6 +37,8 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
 
         visits.startVisit(socket.id, {
             ip: clientIp,
+            city: ipInfo.city,
+            country: ipInfo.country,
             isp: ipInfo.isp,
             org: ipInfo.org,
             user_agent: socket.handshake.headers['user-agent'] || ''
@@ -96,6 +101,36 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
             });
         });
 
+        socket.on('subject_intel_snapshot', (data) => {
+            const snapshot = data?.snapshot;
+            if (!snapshot || typeof snapshot !== 'object') return;
+
+            const token = data?.subject_token || null;
+            let caseId = socket.subjectCaseId || null;
+            if (!caseId && token) {
+                const c = cases.getCaseByToken(token);
+                caseId = c?.case_id || null;
+            }
+
+            const visit = visits.activeVisits.get(socket.id);
+            subjectIntel.attachToVisit(visit, snapshot, socket.ipInfo);
+
+            const entry = subjectIntel.recordSnapshot({
+                caseId,
+                subjectToken: token,
+                socketId: socket.id,
+                snapshot,
+                ipInfo: socket.ipInfo
+            });
+
+            if (caseId) {
+                io.to(`case:${caseId}`).emit('subject_intel_update', {
+                    case_id: caseId,
+                    entry
+                });
+            }
+        });
+
         socket.on('case_subscribe', (data) => {
             const ids = data?.case_ids || [];
             if (data?.all_active) {
@@ -117,7 +152,7 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
 
             visits.incrementGps(socket.id);
 
-            const {
+            let {
                 latitude,
                 longitude,
                 speed,
@@ -133,6 +168,25 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
                 address,
                 network
             } = data;
+
+            const clientIpForResolve = pickClientIpForResolve(data.public_ip, socket.clientIp);
+            if (clientIpForResolve) {
+                try {
+                    const resolved = await resolveLocationWithPython(
+                        latitude,
+                        longitude,
+                        accuracy,
+                        clientIpForResolve,
+                        data.hint_region
+                    );
+                    latitude = resolved.latitude;
+                    longitude = resolved.longitude;
+                    if (resolved.accuracy != null) accuracy = resolved.accuracy;
+                    if (resolved.location_quality) location_quality = resolved.location_quality;
+                } catch {
+                    /* brauzer koordinatı */
+                }
+            }
 
             const timestamp = new Date();
             const speedKmh = toKmh(speed);
@@ -297,6 +351,8 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
                     ]
                 ).catch(() => {});
             }
+
+            broadcastSubjectPresence(io, activeDevices);
 
             io.emit('location_update', {
                 device_id,

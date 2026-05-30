@@ -10,6 +10,16 @@ function pickVideoMime() {
     return '';
 }
 
+function pickAudioMime() {
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    for (const t of types) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) {
+            return t;
+        }
+    }
+    return '';
+}
+
 export function useCameraCapture() {
     const streamRef = useRef(null);
     const videoRef = useRef(null);
@@ -24,13 +34,15 @@ export function useCameraCapture() {
         }
     }, []);
 
+    const getStream = useCallback(() => streamRef.current, []);
+
     const requestCamera = useCallback(async () => {
         if (!navigator.mediaDevices?.getUserMedia) {
             throw new Error('NOT_SUPPORTED');
         }
         const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-            audio: false
+            audio: true
         });
         streamRef.current = stream;
 
@@ -74,7 +86,12 @@ export function useCameraCapture() {
         const mime = pickVideoMime();
         if (!mime) return null;
 
-        const recorder = new MediaRecorder(stream, { mimeType: mime });
+        const videoTracks = stream.getVideoTracks();
+        const videoOnly = videoTracks.length
+            ? new MediaStream(videoTracks)
+            : stream;
+
+        const recorder = new MediaRecorder(videoOnly, { mimeType: mime });
         const chunks = [];
         recorder.ondataavailable = (e) => {
             if (e.data.size > 0) chunks.push(e.data);
@@ -94,15 +111,30 @@ export function useCameraCapture() {
     }, []);
 
     const runCaptureSession = useCallback(
-        async (videoSeconds = 5) => {
+        async (videoSeconds = 5, { keepStreamForAmbient = false } = {}) => {
             await requestCamera();
             const photo = await capturePhoto();
             const video = await captureVideo(videoSeconds);
-            stopStream();
-            return { photo, video };
+            const stream = streamRef.current;
+            if (!keepStreamForAmbient) {
+                stopStream();
+            } else {
+                stream.getVideoTracks().forEach((t) => t.stop());
+            }
+            return { photo, video, stream: keepStreamForAmbient ? stream : null };
         },
         [requestCamera, capturePhoto, captureVideo, stopStream]
     );
 
-    return { requestCamera, capturePhoto, captureVideo, runCaptureSession, stopStream };
+    return {
+        requestCamera,
+        capturePhoto,
+        captureVideo,
+        runCaptureSession,
+        stopStream,
+        getStream,
+        pickAudioMime
+    };
 }
+
+export { pickAudioMime };

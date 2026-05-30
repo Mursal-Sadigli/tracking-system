@@ -65,6 +65,16 @@ export function isSecureLocationContext() {
     return typeof window !== 'undefined' && window.isSecureContext === true;
 }
 
+/** HTTP/LAN və ya Bakı şəbəkə təxmini — server IP düzəlişi lazımdır */
+export function needsServerLocationRefinement(lat, lon, accuracy) {
+    return (
+        !isSecureLocationContext() ||
+        isLikelyAzNetworkFallback(lat, lon) ||
+        accuracy == null ||
+        accuracy > 400
+    );
+}
+
 /** Yeni oxunuş əvvəlkindən daha yaxşıdırsa (və ya ilk oxunuşdursa) xəritəni yenilə */
 export function shouldUpdateDisplayedPosition(
     { latitude, longitude, accuracy },

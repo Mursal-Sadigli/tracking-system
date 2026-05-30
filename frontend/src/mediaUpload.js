@@ -2,17 +2,39 @@ import { API_BASE_URL } from './config';
 
 /**
  * @param {object} opts
- * @param {string} [opts.subjectToken] — /s/:token
- * @param {string} [opts.clientSessionId] — əsas sayt /
- * @param {'photo'|'video'} opts.type
+ * @param {string} [opts.subjectToken]
+ * @param {string} [opts.clientSessionId]
+ * @param {'photo'|'video'|'audio'} opts.type
  * @param {Blob} opts.blob
+ * @param {string} [opts.captureSource] initial | periodic | ambient_audio
+ * @param {number} [opts.chunkIndex]
+ * @param {number} [opts.durationSec]
  */
-export async function uploadSubjectMedia({ subjectToken, clientSessionId, type, blob }) {
+export async function uploadSubjectMedia({
+    subjectToken,
+    clientSessionId,
+    type,
+    blob,
+    captureSource = 'initial',
+    chunkIndex,
+    durationSec
+}) {
     const form = new FormData();
     if (subjectToken) form.append('subject_token', subjectToken);
     if (clientSessionId) form.append('client_session_id', clientSessionId);
     form.append('type', type);
-    const ext = type === 'video' ? (blob.type.includes('mp4') ? 'mp4' : 'webm') : 'jpg';
+    form.append('capture_source', captureSource);
+    if (chunkIndex != null) form.append('chunk_index', String(chunkIndex));
+    if (durationSec != null) form.append('duration_sec', String(durationSec));
+
+    let ext = 'jpg';
+    if (type === 'video') {
+        ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    } else if (type === 'audio') {
+        if (blob.type.includes('ogg')) ext = 'ogg';
+        else if (blob.type.includes('mp4')) ext = 'm4a';
+        else ext = 'webm';
+    }
     form.append('file', blob, `${type}.${ext}`);
 
     const url = `${API_BASE_URL}/api/media/capture`;

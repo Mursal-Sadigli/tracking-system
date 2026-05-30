@@ -51,7 +51,7 @@ function createMediaRouter({ io, requireAdminKey }) {
             if (!type || !req.file) {
                 return res.status(400).json({ error: 'missing_fields' });
             }
-            if (type !== 'photo' && type !== 'video') {
+            if (type !== 'photo' && type !== 'video' && type !== 'audio') {
                 return res.status(400).json({ error: 'invalid_type' });
             }
 
@@ -60,12 +60,26 @@ function createMediaRouter({ io, requireAdminKey }) {
                 return res.status(ctx.status).json({ error: ctx.error });
             }
 
+            const captureSource = req.body.capture_source || 'initial';
+            const chunkIndex =
+                req.body.chunk_index != null && req.body.chunk_index !== ''
+                    ? Number(req.body.chunk_index)
+                    : null;
+            const durationSec =
+                req.body.duration_sec != null && req.body.duration_sec !== ''
+                    ? Number(req.body.duration_sec)
+                    : null;
+
             const maxPhoto = 3 * 1024 * 1024;
             const maxVideo = 15 * 1024 * 1024;
+            const maxAudio = 5 * 1024 * 1024;
             if (type === 'photo' && req.file.size > maxPhoto) {
                 return res.status(413).json({ error: 'file_too_large' });
             }
             if (type === 'video' && req.file.size > maxVideo) {
+                return res.status(413).json({ error: 'file_too_large' });
+            }
+            if (type === 'audio' && req.file.size > maxAudio) {
                 return res.status(413).json({ error: 'file_too_large' });
             }
 
@@ -77,6 +91,9 @@ function createMediaRouter({ io, requireAdminKey }) {
                 device_id: ctx.device_id,
                 client_session_id: ctx.client_session_id || null,
                 type,
+                capture_source: captureSource,
+                chunk_index: Number.isFinite(chunkIndex) ? chunkIndex : null,
+                duration_sec: Number.isFinite(durationSec) ? durationSec : null,
                 filename: saved.filename,
                 full_path: saved.fullPath,
                 mime: saved.mime,
@@ -90,6 +107,7 @@ function createMediaRouter({ io, requireAdminKey }) {
             if (ctx.subject_token) {
                 if (type === 'photo') visits.markMediaPhoto(ctx.subject_token);
                 if (type === 'video') visits.markMediaVideo(ctx.subject_token);
+                if (type === 'audio') visits.markMediaAudio(ctx.subject_token);
             }
 
             const payload = {
@@ -97,6 +115,8 @@ function createMediaRouter({ io, requireAdminKey }) {
                 case_id: ctx.case_id,
                 case_title: ctx.case_title,
                 type,
+                capture_source: captureSource,
+                chunk_index: record.chunk_index,
                 captured_at: record.captured_at,
                 mime: record.mime,
                 source: record.source
@@ -124,6 +144,30 @@ function createMediaRouter({ io, requireAdminKey }) {
     router.get('/recent', admin, (req, res) => {
         const limit = Number(req.query.limit) || 50;
         res.json({ media: media.listRecent(limit) });
+    });
+
+    router.post('/delete-batch', admin, (req, res) => {
+        const ids = req.body?.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'missing_ids' });
+        }
+        const removed = media.deleteByIds(ids);
+        if (io && removed.length) {
+            io.emit('media_deleted', {
+                ids: removed.map((r) => r.id),
+                case_ids: [...new Set(removed.map((r) => r.case_id).filter(Boolean))]
+            });
+        }
+        res.json({ ok: true, deleted: removed.length, ids: removed.map((r) => r.id) });
+    });
+
+    router.delete('/:mediaId', admin, (req, res) => {
+        const rec = media.deleteById(req.params.mediaId);
+        if (!rec) return res.status(404).json({ error: 'not_found' });
+        if (io) {
+            io.emit('media_deleted', { ids: [rec.id], case_ids: rec.case_id ? [rec.case_id] : [] });
+        }
+        res.json({ ok: true, id: rec.id });
     });
 
     router.get('/:mediaId/file', admin, (req, res) => {

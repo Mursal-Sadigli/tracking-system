@@ -5,8 +5,10 @@ import {
     GPS_WATCH_OPTIONS,
     getLocationQuality,
     shouldUpdateDisplayedPosition,
-    haversineMeters
+    haversineMeters,
+    needsServerLocationRefinement
 } from '../geolocation';
+import { resolveLocationApi } from '../api';
 import { getNetworkInfo } from '../deviceInfo';
 
 function calculateHeading(prevLat, prevLon, currLat, currLon) {
@@ -69,6 +71,8 @@ export function useLocationTracker({
     const batteryRef = useRef({ level: 100, charging: false });
     const handleGeoPositionRef = useRef(null);
     const refreshLocationRef = useRef(() => {});
+    const publicIpRef = useRef(null);
+    const locationResolveGenRef = useRef(0);
 
     const callbacksRef = useRef({});
     callbacksRef.current = {
@@ -90,6 +94,14 @@ export function useLocationTracker({
 
         const socket = getTrackingSocket();
         socketRef.current = socket;
+
+        let ipCancelled = false;
+        fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((d) => {
+                if (!ipCancelled && d?.ip) publicIpRef.current = String(d.ip);
+            })
+            .catch(() => {});
 
         const getBatteryStatus = async () => {
             try {
@@ -127,7 +139,6 @@ export function useLocationTracker({
                 return;
             }
 
-            const quality = getLocationQuality(accuracy);
             callbacksRef.current.onLocationRefining?.(false);
 
             const now = position.timestamp || Date.now();
@@ -159,65 +170,107 @@ export function useLocationTracker({
                 }
             }
 
-            lastLocationRef.current = { latitude, longitude, timestamp: now };
+            const resolveGen = ++locationResolveGenRef.current;
 
-            const speedKmh = calculatedSpeed * 3.6;
-            const devicePatch = {
-                device_id: deviceId,
-                lat: latitude,
-                lon: longitude,
-                speed: calculatedSpeed,
-                speed_kmh: Math.round(speedKmh * 10) / 10,
-                heading,
-                is_moving: calculatedSpeed > 0.3,
-                battery_level: batteryRef.current.level,
-                battery_charging: batteryRef.current.charging,
-                accuracy,
-                location_quality: quality,
-                lastUpdate: new Date(now).toISOString(),
-                device_name: deviceInfo?.device_name,
-                device_type: deviceInfo?.device_type,
-                browser: deviceInfo?.browser,
-                network_online: navigator.onLine,
-                network_type: getNetworkInfo().effective_type
+            const publishLocation = (outLat, outLon, outAccuracy, quality) => {
+                if (resolveGen !== locationResolveGenRef.current) return;
+
+                lastLocationRef.current = {
+                    latitude: outLat,
+                    longitude: outLon,
+                    timestamp: now
+                };
+
+                const speedKmh = calculatedSpeed * 3.6;
+                const devicePatch = {
+                    device_id: deviceId,
+                    lat: outLat,
+                    lon: outLon,
+                    speed: calculatedSpeed,
+                    speed_kmh: Math.round(speedKmh * 10) / 10,
+                    heading,
+                    is_moving: calculatedSpeed > 0.3,
+                    battery_level: batteryRef.current.level,
+                    battery_charging: batteryRef.current.charging,
+                    accuracy: outAccuracy,
+                    location_quality: quality,
+                    lastUpdate: new Date(now).toISOString(),
+                    device_name: deviceInfo?.device_name,
+                    device_type: deviceInfo?.device_type,
+                    browser: deviceInfo?.browser,
+                    network_online: navigator.onLine,
+                    network_type: getNetworkInfo().effective_type
+                };
+
+                callbacksRef.current.onDevicesChange?.((prev) => {
+                    const index = prev.findIndex((d) => d.device_id === deviceId);
+                    if (index >= 0) {
+                        const next = [...prev];
+                        next[index] = { ...next[index], ...devicePatch };
+                        return next;
+                    }
+                    return [...prev, devicePatch];
+                });
+
+                callbacksRef.current.onUserLocation?.({
+                    lat: outLat,
+                    lon: outLon,
+                    accuracy: outAccuracy,
+                    quality
+                });
+
+                if (!socket.connected) return;
+
+                socket.emit('user_location_update', {
+                    device_id: deviceId,
+                    latitude: outLat,
+                    longitude: outLon,
+                    speed: calculatedSpeed,
+                    heading,
+                    accuracy: outAccuracy,
+                    location_quality: quality,
+                    battery_level: batteryRef.current.level,
+                    battery_charging: batteryRef.current.charging,
+                    device_name: deviceInfo?.device_name,
+                    device_type: deviceInfo?.device_type,
+                    browser: deviceInfo?.browser,
+                    user_agent: deviceInfo?.user_agent,
+                    os: deviceInfo?.os,
+                    network: getNetworkInfo(),
+                    public_ip: publicIpRef.current || undefined
+                });
             };
 
-            callbacksRef.current.onDevicesChange?.((prev) => {
-                const index = prev.findIndex((d) => d.device_id === deviceId);
-                if (index >= 0) {
-                    const next = [...prev];
-                    next[index] = { ...next[index], ...devicePatch };
-                    return next;
+            void (async () => {
+                let outLat = latitude;
+                let outLon = longitude;
+                let outAccuracy = accuracy;
+                let quality = getLocationQuality(accuracy);
+
+                const pubIp = publicIpRef.current;
+                if (pubIp && needsServerLocationRefinement(latitude, longitude, accuracy)) {
+                    try {
+                        const resolved = await resolveLocationApi(
+                            latitude,
+                            longitude,
+                            accuracy,
+                            null,
+                            pubIp
+                        );
+                        if (resolveGen !== locationResolveGenRef.current) return;
+                        if (resolved?.latitude != null && resolved?.longitude != null) {
+                            outLat = resolved.latitude;
+                            outLon = resolved.longitude;
+                            if (resolved.accuracy != null) outAccuracy = resolved.accuracy;
+                            quality = resolved.location_quality || getLocationQuality(outAccuracy);
+                        }
+                    } catch {
+                        /* brauzer koordinatı */
+                    }
                 }
-                return [...prev, devicePatch];
-            });
 
-            callbacksRef.current.onUserLocation?.({
-                lat: latitude,
-                lon: longitude,
-                accuracy,
-                quality
-            });
-
-            if (!socket.connected) return;
-
-            socket.emit('user_location_update', {
-                device_id: deviceId,
-                latitude,
-                longitude,
-                speed: calculatedSpeed,
-                heading,
-                accuracy,
-                location_quality: quality,
-                battery_level: batteryRef.current.level,
-                battery_charging: batteryRef.current.charging,
-                device_name: deviceInfo?.device_name,
-                device_type: deviceInfo?.device_type,
-                browser: deviceInfo?.browser,
-                user_agent: deviceInfo?.user_agent,
-                os: deviceInfo?.os,
-                network: getNetworkInfo()
-            });
+                publishLocation(outLat, outLon, outAccuracy, quality);
+            })();
         };
 
         const onPosition = (position) => handleGeoPositionRef.current?.(position);
@@ -379,6 +432,7 @@ export function useLocationTracker({
         }
 
         return () => {
+            ipCancelled = true;
             socket.off('connect', onConnect);
             socket.off('disconnect', onDisconnect);
             socket.off('connect_error', onConnectError);

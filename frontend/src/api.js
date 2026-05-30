@@ -55,6 +55,15 @@ export async function apiPatch(path, body) {
     return parseJsonResponse(response, path);
 }
 
+export async function apiDelete(path, { admin = false } = {}) {
+    const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+    const response = await fetch(url, {
+        method: 'DELETE',
+        headers: admin ? getAdminHeaders() : { Accept: 'application/json' }
+    });
+    return parseJsonResponse(response, path);
+}
+
 export async function apiPut(path, body) {
     const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
     const response = await fetch(url, {
@@ -77,11 +86,12 @@ export async function getMediaObjectUrl(mediaId) {
     return URL.createObjectURL(blob);
 }
 
-export async function resolveLocationApi(lat, lon, accuracy, hintRegion) {
+export async function resolveLocationApi(lat, lon, accuracy, hintRegion, clientIp) {
     return apiPost('/api/location/resolve', {
         latitude: lat,
         longitude: lon,
         accuracy: accuracy ?? null,
-        hint_region: hintRegion || null
+        hint_region: hintRegion || null,
+        client_ip: clientIp || null
     });
 }

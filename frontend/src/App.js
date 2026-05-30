@@ -7,6 +7,7 @@ import AdminGate from './auth/AdminGate';
 import WallMode from './command/WallMode';
 import WatchPage from './WatchPage';
 import { ADMIN_PATH, COMMAND_PATH } from './config';
+import ShareMeta from './ShareMeta';
 
 function App() {
     const adminRoute = ADMIN_PATH.startsWith('/') ? ADMIN_PATH : `/${ADMIN_PATH}`;
@@ -15,7 +16,9 @@ function App() {
         : `/${COMMAND_PATH}/wall`;
 
     return (
-        <Routes>
+        <>
+            <ShareMeta />
+            <Routes>
             <Route path="/" element={<SubjectPage />} />
             <Route path="/s/:token" element={<SubjectSessionPage />} />
             <Route path="/watch/:token" element={<WatchPage />} />
@@ -36,7 +39,8 @@ function App() {
                 }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            </Routes>
+        </>
     );
 }
 

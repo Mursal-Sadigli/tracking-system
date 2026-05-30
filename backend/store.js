@@ -21,7 +21,9 @@ const store = {
     anomalyRules: { global: {}, by_case: {} },
     caseBriefings: {},
     routineZones: {},
-    mediaRecords: []
+    mediaRecords: [],
+    watchZones: new Map(),
+    watchZoneExternal: new Map()
 };
 
 function serialize() {
@@ -42,7 +44,9 @@ function serialize() {
         anomalyRules: store.anomalyRules || { global: {}, by_case: {} },
         caseBriefings: store.caseBriefings || {},
         routineZones: store.routineZones || {},
-        mediaRecords: (store.mediaRecords || []).slice(-2000)
+        mediaRecords: (store.mediaRecords || []).slice(-2000),
+        watchZones: Array.from((store.watchZones || new Map()).entries()),
+        watchZoneExternal: Array.from((store.watchZoneExternal || new Map()).entries())
     };
 }
 
@@ -65,6 +69,8 @@ function hydrate(data) {
     store.caseBriefings = data.caseBriefings || {};
     store.routineZones = data.routineZones || {};
     store.mediaRecords = data.mediaRecords || [];
+    store.watchZones = new Map(data.watchZones || []);
+    store.watchZoneExternal = new Map(data.watchZoneExternal || []);
 }
 
 function persist() {

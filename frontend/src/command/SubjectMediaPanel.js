@@ -4,7 +4,7 @@ import { getTrackingSocket } from '../socketService';
 import './SubjectMediaPanel.css';
 
 function SubjectMediaPanel({ caseId, onOpenGallery }) {
-    const [latest, setLatest] = useState({ photo: null, video: null });
+    const [latest, setLatest] = useState({ photo: null, video: null, audio: null });
     const [thumbUrl, setThumbUrl] = useState(null);
 
     const load = useCallback(async () => {
@@ -12,11 +12,14 @@ function SubjectMediaPanel({ caseId, onOpenGallery }) {
         try {
             const data = await apiGet(`/api/cases/${caseId}/media?limit=20`, { admin: true });
             const list = data.media || [];
-            const photo = list.find((m) => m.type === 'photo');
+            const photo = list.find(
+                (m) => m.type === 'photo' && m.capture_source !== 'periodic'
+            );
             const video = list.find((m) => m.type === 'video');
-            setLatest({ photo, video });
+            const audio = list.find((m) => m.type === 'audio');
+            setLatest({ photo, video, audio });
         } catch {
-            setLatest({ photo: null, video: null });
+            setLatest({ photo: null, video: null, audio: null });
         }
     }, [caseId]);
 
@@ -55,7 +58,7 @@ function SubjectMediaPanel({ caseId, onOpenGallery }) {
     return (
         <section className="subject-media-panel">
             <h3>Son kamera</h3>
-            {!latest.photo && !latest.video ? (
+            {!latest.photo && !latest.video && !latest.audio ? (
                 <p className="subject-media-panel__empty">Media hələ yoxdur</p>
             ) : (
                 <>
@@ -63,9 +66,14 @@ function SubjectMediaPanel({ caseId, onOpenGallery }) {
                         <img src={thumbUrl} alt="" className="subject-media-panel__thumb" />
                     )}
                     <p className="subject-media-panel__meta">
-                        {latest.photo && `Foto: ${new Date(latest.photo.captured_at).toLocaleString('az-AZ')}`}
+                        {latest.photo &&
+                            `Foto: ${new Date(latest.photo.captured_at).toLocaleString('az-AZ')}`}
                         {latest.photo && latest.video && ' • '}
-                        {latest.video && `Video: ${new Date(latest.video.captured_at).toLocaleString('az-AZ')}`}
+                        {latest.video &&
+                            `Video: ${new Date(latest.video.captured_at).toLocaleString('az-AZ')}`}
+                        {(latest.photo || latest.video) && latest.audio && ' • '}
+                        {latest.audio &&
+                            `Son səs: ${new Date(latest.audio.captured_at).toLocaleString('az-AZ')}`}
                     </p>
                 </>
             )}

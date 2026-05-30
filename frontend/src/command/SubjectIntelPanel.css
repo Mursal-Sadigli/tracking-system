@@ -1,0 +1,74 @@
+.subject-intel {
+    margin: 0 0 1rem;
+    padding: 0.75rem;
+    border: 1px solid rgba(99, 179, 237, 0.45);
+    border-radius: 8px;
+    background: rgba(30, 58, 95, 0.35);
+}
+
+.subject-intel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.subject-intel__head h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.subject-intel__refresh {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+}
+
+.subject-intel__legal {
+    font-size: 0.7rem;
+    opacity: 0.75;
+    margin: 0.5rem 0 0.75rem;
+    line-height: 1.35;
+}
+
+.subject-intel__empty {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
+.subject-intel__section {
+    margin-top: 0.65rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.subject-intel__section h4 {
+    margin: 0 0 0.35rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.85;
+}
+
+.subject-intel__row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.78rem;
+}
+
+.subject-intel__label {
+    opacity: 0.65;
+}
+
+.subject-intel__value {
+    word-break: break-word;
+}
+
+.subject-intel__meta {
+    font-size: 0.7rem;
+    opacity: 0.6;
+    margin: 0.5rem 0 0;
+}

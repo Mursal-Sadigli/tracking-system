@@ -12,16 +12,16 @@ const { createApiRouter } = require('./routes');
 const { createMediaRouter } = require('./mediaRoutes');
 const mediaStore = require('./media');
 const { attachSocketHandlers } = require('./socketHandlers');
+const { startAreaWatchWorker } = require('./areaWatchWorker');
 const { startBriefingWorker } = require('./briefingWorker');
 const { setCoLocationHandler } = require('./intel');
 const { emitCaseEvent } = require('./events');
 const { runAnalyticsBatch } = require('./pythonClient');
 const { getConsentLogs } = require('./compliance');
 
-const PYTHON_LOCATION_API = process.env.PYTHON_LOCATION_API || 'http://127.0.0.1:5001';
 const PYTHON_SERVICE_DIR = path.join(__dirname, '..', 'python-service');
-const locationResolveCache = new Map();
-const LOCATION_CACHE_MS = 8000;
+const PYTHON_LOCATION_API = process.env.PYTHON_LOCATION_API || 'http://127.0.0.1:5001';
+const { resolveLocationWithPython, pickClientIpForResolve } = require('./locationResolve');
 
 const app = express();
 const server = http.createServer(app);
@@ -76,17 +76,20 @@ const io = new Server(server, {
                 callback(null, false);
             }
         },
-        methods: ['GET', 'POST', 'OPTIONS']
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
     },
     transports: ['polling', 'websocket'],
     pingTimeout: 60000,
     pingInterval: 25000
 });
 
+const CORS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
+
 app.use(
     cors({
         origin: corsOrigin,
-        methods: ['GET', 'POST', 'OPTIONS']
+        methods: CORS_METHODS,
+        allowedHeaders: ['Content-Type', 'Accept', 'X-Admin-Key']
     })
 );
 app.use(express.json({ limit: '2mb' }));
@@ -149,63 +152,6 @@ function getClientIp(socket) {
     const forwarded = socket.handshake.headers['x-forwarded-for'];
     if (forwarded) return String(forwarded).split(',')[0].trim();
     return String(socket.handshake.address || '').replace('::ffff:', '');
-}
-
-async function resolveLocationWithPython(latitude, longitude, accuracy, clientIp, hintRegion) {
-    const cacheKey = `${Number(latitude).toFixed(3)}_${Number(longitude).toFixed(3)}_${clientIp || 'noip'}_${hintRegion || ''}`;
-    const cached = locationResolveCache.get(cacheKey);
-    if (cached && Date.now() - cached.at < LOCATION_CACHE_MS) {
-        return cached.result;
-    }
-
-    const payload = {
-        latitude: Number(latitude),
-        longitude: Number(longitude),
-        accuracy: accuracy != null ? Number(accuracy) : null,
-        client_ip: clientIp || null,
-        hint_region: hintRegion || null
-    };
-
-    let result = null;
-
-    try {
-        const res = await axios.post(`${PYTHON_LOCATION_API}/resolve`, payload, { timeout: 4500 });
-        result = res.data;
-    } catch {
-        try {
-            const spawnResult = spawnSync(
-                getPythonExecutable(),
-                [
-                    path.join(PYTHON_SERVICE_DIR, 'location_resolver.py'),
-                    '--payload',
-                    JSON.stringify(payload)
-                ],
-                { encoding: 'utf8', timeout: 6000, cwd: PYTHON_SERVICE_DIR }
-            );
-            if (spawnResult.status === 0 && spawnResult.stdout?.trim()) {
-                result = JSON.parse(spawnResult.stdout.trim());
-            }
-        } catch (err) {
-            console.error('Python location_resolver error:', err.message);
-        }
-    }
-
-    if (!result) {
-        result = {
-            latitude: payload.latitude,
-            longitude: payload.longitude,
-            accuracy: payload.accuracy,
-            corrected: false,
-            source: 'browser_gps',
-            city: '',
-            region: 'unknown',
-            location_quality: 'approximate',
-            reason: 'python_unavailable'
-        };
-    }
-
-    locationResolveCache.set(cacheKey, { at: Date.now(), result });
-    return result;
 }
 
 function startPythonLocationApi() {
@@ -506,10 +452,11 @@ app.get('/api/analytics/risk-zones', (req, res) => {
 app.post('/api/location/resolve', async (req, res) => {
     try {
         const { latitude, longitude, accuracy, client_ip: bodyIp, hint_region: hintRegion } = req.body;
-        const clientIp =
-            bodyIp ||
+        const clientIp = pickClientIpForResolve(
+            bodyIp,
             req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-            req.socket.remoteAddress?.replace('::ffff:', '');
+                req.socket.remoteAddress?.replace('::ffff:', '')
+        );
 
         const resolved = await resolveLocationWithPython(
             latitude,
@@ -630,7 +577,8 @@ app.use(
     createApiRouter({
         activeDevices,
         deviceHistory,
-        requireAdminKey
+        requireAdminKey,
+        io
     })
 );
 app.use('/api/media', createMediaRouter({ io, requireAdminKey }));
@@ -658,6 +606,8 @@ attachSocketHandlers(io, {
     toKmh,
     triggerBriefing: briefingWorker.triggerBriefing
 });
+
+startAreaWatchWorker(io, activeDevices);
 
 // Start server
 const PORT = process.env.PORT || 3500;

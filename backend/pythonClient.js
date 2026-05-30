@@ -62,11 +62,16 @@ async function runRoutineZones(history) {
     return postPython('/intel/routine-zones', { history }, 15000);
 }
 
+async function fuseAreaZone(payload) {
+    return postPython('/area/fuse', payload, 15000);
+}
+
 module.exports = {
     PYTHON_API,
     runAnalyticsBatch,
     generateBriefing,
     checkGeofenceBatch,
     runIntelProfile,
-    runRoutineZones
+    runRoutineZones,
+    fuseAreaZone
 };

@@ -1,0 +1,153 @@
+.zone-watch {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: calc(100vh - 120px);
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+.zone-watch__sidebar {
+    padding: 1rem;
+    background: #1e293b;
+    border-right: 1px solid #334155;
+    overflow-y: auto;
+}
+
+.zone-watch__sidebar h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+}
+
+.zone-watch__legal {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 1px solid #334155;
+}
+
+.zone-watch__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.zone-watch__actions button {
+    padding: 0.45rem 0.65rem;
+    border: none;
+    border-radius: 8px;
+    background: #334155;
+    color: #e2e8f0;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.zone-watch__actions button.is-primary {
+    background: #2563eb;
+}
+
+.zone-watch__actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.zone-watch__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+}
+
+.zone-watch__list li {
+    margin-bottom: 0.4rem;
+}
+
+.zone-watch__list button {
+    width: 100%;
+    text-align: left;
+    padding: 0.55rem;
+    border-radius: 8px;
+    border: none;
+    background: #334155;
+    color: inherit;
+    cursor: pointer;
+}
+
+.zone-watch__list button.is-active {
+    background: #2563eb;
+}
+
+.zone-watch__briefing {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #cbd5e1;
+    margin-top: 0.75rem;
+    padding: 0.65rem;
+    background: #0f172a;
+    border-radius: 8px;
+}
+
+.zone-watch__counts {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 0.25rem;
+}
+
+.zone-watch__map-wrap {
+    position: relative;
+    min-height: 480px;
+}
+
+.zone-watch__map {
+    width: 100%;
+    height: calc(100vh - 120px);
+    min-height: 480px;
+}
+
+.zone-watch__hint {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 1000;
+    background: rgba(15, 23, 42, 0.9);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    max-width: 280px;
+}
+
+.zone-watch__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    font-size: 0.7rem;
+}
+
+.zone-watch__legend span {
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+}
+
+.zone-watch__legend .subj {
+    background: #22c55e33;
+    color: #86efac;
+}
+
+.zone-watch__legend .traffic {
+    background: #eab30833;
+    color: #fde047;
+}
+
+.zone-watch__legend .foot {
+    background: #f9731633;
+    color: #fdba74;
+}
+
+.zone-watch__legend .ext {
+    background: #a855f733;
+    color: #d8b4fe;
+}

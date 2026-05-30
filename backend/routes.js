@@ -18,8 +18,12 @@ const visits = require('./visits');
 const shareLinks = require('./shareLinks');
 const cases = require('./cases');
 const media = require('./media');
+const watchZones = require('./watchZones');
+const { buildZoneSnapshot } = require('./areaProviders');
+const subjectIntel = require('./subjectIntel');
+const { lookupIp } = require('./ipLookup');
 
-function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
+function createApiRouter({ activeDevices, deviceHistory, requireAdminKey, io }) {
     const router = express.Router();
     const admin = requireAdminKey;
 
@@ -244,6 +248,74 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
         res.json({ visits: visits.listVisits(Number(req.query.limit) || 100) });
     });
 
+    router.get('/cases/:caseId/subject-intel', admin, (req, res) => {
+        const intel = subjectIntel.getCaseIntel(req.params.caseId);
+        res.json(intel);
+    });
+
+    router.post('/subject-intel/snapshot', async (req, res) => {
+        try {
+            const { subject_token: token, snapshot } = req.body || {};
+            if (!token || !snapshot) {
+                return res.status(400).json({ error: 'missing_fields' });
+            }
+            const c = cases.getCaseByToken(token);
+            if (!c) return res.status(404).json({ error: 'invalid_token' });
+
+            const clientIp =
+                req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                String(req.socket.remoteAddress || '').replace('::ffff:', '');
+            const ipInfo = await lookupIp(clientIp);
+
+            const entry = subjectIntel.recordSnapshot({
+                caseId: c.case_id,
+                subjectToken: token,
+                socketId: null,
+                snapshot,
+                ipInfo
+            });
+
+            if (io) {
+                io.to(`case:${c.case_id}`).emit('subject_intel_update', {
+                    case_id: c.case_id,
+                    entry
+                });
+            }
+
+            res.json({ ok: true, case_id: c.case_id, entry_id: entry.id });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    router.post('/subject-intel/beacon', (req, res) => {
+        const token = req.body?.subject_token;
+        if (token) {
+            const c = cases.getCaseByToken(token);
+            if (c) {
+                const entry = subjectIntel.recordSnapshot({
+                    caseId: c.case_id,
+                    subjectToken: token,
+                    socketId: null,
+                    snapshot: {
+                        phase: req.body?.phase || 'beacon_unload',
+                        collected_at: new Date().toISOString(),
+                        beacon: true
+                    },
+                    ipInfo: {
+                        ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress,
+                        city: null,
+                        country: null,
+                        isp: null,
+                        org: null
+                    }
+                });
+                return res.json({ ok: true, entry_id: entry.id });
+            }
+        }
+        res.json({ ok: true });
+    });
+
     router.get('/cases/:caseId/media', admin, (req, res) => {
         res.json({ media: media.listByCase(req.params.caseId, Number(req.query.limit) || 50) });
     });
@@ -271,6 +343,55 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey }) {
             expires_at: link.expires_at,
             device: device || null
         });
+    });
+
+    router.get('/watch-zones', admin, (req, res) => {
+        res.json({ zones: watchZones.listWatchZones() });
+    });
+
+    router.post('/watch-zones', admin, (req, res) => {
+        try {
+            const zone = watchZones.createWatchZone({
+                name: req.body.name,
+                polygon: req.body.polygon,
+                enabled: req.body.enabled
+            });
+            res.status(201).json(zone);
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
+    router.patch('/watch-zones/:id', admin, (req, res) => {
+        const zone = watchZones.updateWatchZone(req.params.id, req.body);
+        if (!zone) return res.status(404).json({ error: 'not_found' });
+        res.json(zone);
+    });
+
+    router.delete('/watch-zones/:id', admin, (req, res) => {
+        watchZones.deleteWatchZone(req.params.id);
+        res.json({ ok: true });
+    });
+
+    router.get('/watch-zones/:id/presence', admin, async (req, res) => {
+        const zone = watchZones.getWatchZone(req.params.id);
+        if (!zone) return res.status(404).json({ error: 'not_found' });
+        const subjects = watchZones.getSubjectsInZone(activeDevices, zone.polygon);
+        res.json({ zone_id: zone.id, subjects });
+    });
+
+    router.get('/watch-zones/:id/snapshot', admin, async (req, res) => {
+        const zone = watchZones.getWatchZone(req.params.id);
+        if (!zone) return res.status(404).json({ error: 'not_found' });
+        const snapshot = await buildZoneSnapshot(zone, activeDevices);
+        res.json(snapshot);
+    });
+
+    router.post('/watch-zones/:id/external-ingest', admin, (req, res) => {
+        const zone = watchZones.getWatchZone(req.params.id);
+        if (!zone) return res.status(404).json({ error: 'not_found' });
+        watchZones.setExternalIngest(req.params.id, req.body.devices || []);
+        res.json({ ok: true, count: (req.body.devices || []).length });
     });
 
     return router;

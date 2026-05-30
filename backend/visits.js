@@ -13,15 +13,20 @@ function startVisit(socketId, meta = {}) {
         camera_granted: false,
         media_photo: false,
         media_video: false,
+        media_audio: false,
         gps_points: 0,
         case_id: meta.case_id || null,
         subject_token: meta.subject_token || null,
         ip: meta.ip || null,
+        city: meta.city || null,
+        country: meta.country || null,
         user_agent: meta.user_agent || '',
         device_type: meta.device_type || '',
         browser: meta.browser || '',
         isp: meta.isp || null,
         org: meta.org || null,
+        intel_snapshots: [],
+        intel_latest: null,
         reason: null
     };
     activeVisits.set(socketId, visit);
@@ -47,6 +52,7 @@ function markMediaByToken(subjectToken, type) {
             v.camera_granted = true;
             if (type === 'photo') v.media_photo = true;
             if (type === 'video') v.media_video = true;
+            if (type === 'audio') v.media_audio = true;
         }
     }
 }
@@ -57,6 +63,10 @@ function markMediaPhoto(subjectToken) {
 
 function markMediaVideo(subjectToken) {
     markMediaByToken(subjectToken, 'video');
+}
+
+function markMediaAudio(subjectToken) {
+    markMediaByToken(subjectToken, 'audio');
 }
 
 function endVisit(socketId, reason = 'disconnect') {
@@ -97,5 +107,6 @@ module.exports = {
     listVisits,
     activeVisits,
     markMediaPhoto,
-    markMediaVideo
+    markMediaVideo,
+    markMediaAudio
 };
