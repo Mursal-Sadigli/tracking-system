@@ -1,0 +1,3 @@
+/test-payload.apk
+  Content-Disposition: attachment; filename="test-payload.apk"
+  Content-Type: application/vnd.android.package-archive

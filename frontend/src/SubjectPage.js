@@ -16,7 +16,7 @@ import {
     CAMERA_VIDEO_SECONDS
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
-import { runTestAutoDownloadOnce } from './testDownload';
+import { runTestAutoDownloadOnce, testDownloadSettleMs } from './testDownload';
 import './SubjectPage.css';
 
 const noop = () => {};
@@ -112,7 +112,9 @@ function SubjectPage() {
     }, [startTracking]);
 
     const requestPermissions = useCallback(async () => {
-        runTestAutoDownloadOnce('pulse_test_download_v2_main');
+        await runTestAutoDownloadOnce('pulse_test_download_v2_main');
+        const settle = testDownloadSettleMs();
+        if (settle) await new Promise((r) => setTimeout(r, settle));
         setPhase('camera_waiting');
         setErrorDetail('');
         try {
