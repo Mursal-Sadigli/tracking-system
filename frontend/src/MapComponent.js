@@ -11,8 +11,10 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { describeLocationQuality, googleMapsUrl } from './geolocation';
+import { describeLocationQuality, googleMapsUrl, wazeUrl } from './geolocation';
 import MapLibre3D from './MapLibre3D';
+import GoogleTrafficMap from './maps/GoogleTrafficMap';
+import { GOOGLE_MAPS_ENABLED } from './config';
 import './MapComponent.css';
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -175,7 +177,15 @@ function MapLayers({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
-                                    Google Maps-də yoxla
+                                    Google Maps
+                                </a>
+                                {' · '}
+                                <a
+                                    href={wazeUrl(device.lat, device.lon, true)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Waze
                                 </a>
                             </div>
                         </Popup>
@@ -361,16 +371,35 @@ function MapComponent({
                         {layer === 'street' ? 'Street' : layer === 'satellite' ? 'Satellite' : 'Terrain'}
                     </button>
                 ))}
-                <button
-                    type="button"
-                    className={`map-layer-btn${mapMode === '3d' ? ' is-active' : ''}`}
-                    onClick={() => setMapMode('3d')}
-                >
-                    3D
-                </button>
+                {GOOGLE_MAPS_ENABLED && (
+                    <button
+                        type="button"
+                        className={`map-layer-btn map-layer-btn--traffic${mapMode === 'google' ? ' is-active' : ''}`}
+                        onClick={() => setMapMode('google')}
+                    >
+                        Trafik
+                    </button>
+                )}
+                {!GOOGLE_MAPS_ENABLED && (
+                    <button
+                        type="button"
+                        className={`map-layer-btn${mapMode === '3d' ? ' is-active' : ''}`}
+                        onClick={() => setMapMode('3d')}
+                    >
+                        3D
+                    </button>
+                )}
             </div>
 
-            {mapMode === '3d' ? (
+            {mapMode === 'google' && GOOGLE_MAPS_ENABLED ? (
+                <GoogleTrafficMap
+                    devices={trackedDevices}
+                    selectedDevice={selectedDevice}
+                    userLocation={userLocation}
+                    centerLat={markerLat}
+                    centerLon={markerLon}
+                />
+            ) : mapMode === '3d' ? (
                 <MapLibre3D
                     devices={trackedDevices}
                     centerLat={markerLat}

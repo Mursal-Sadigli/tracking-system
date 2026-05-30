@@ -1,0 +1,77 @@
+.google-traffic-map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: inherit;
+}
+
+.google-traffic-map--loading,
+.google-traffic-map--error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: inherit;
+    padding: 1rem;
+    text-align: center;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.9rem;
+}
+
+.google-traffic-map--error {
+    color: #b91c1c;
+}
+
+.google-traffic-map__hud {
+    position: absolute;
+    z-index: 2;
+    top: 52px;
+    left: 8px;
+    right: 8px;
+    max-width: 420px;
+    padding: 0.5rem 0.65rem;
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.google-traffic-map__hint {
+    color: #64748b;
+}
+
+.google-traffic-map__error {
+    color: #b91c1c;
+}
+
+.google-traffic-map__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+}
+
+.google-traffic-map__links a {
+    color: #2563eb;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.google-traffic-map__links a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+    .google-traffic-map__hud {
+        top: auto;
+        bottom: 56px;
+        left: 8px;
+        right: 8px;
+        max-width: none;
+    }
+}

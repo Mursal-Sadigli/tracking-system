@@ -263,3 +263,74 @@
         opacity: 1;
     }
 }
+
+.pulse-entry {
+    position: relative;
+    overflow: hidden;
+}
+
+.pulse-entry__level {
+    opacity: 0.85;
+}
+
+.pulse-entry__grid {
+    pointer-events: none;
+}
+
+.pulse-entry__card {
+    cursor: default;
+    opacity: 0.55;
+    filter: saturate(0.7);
+}
+
+.pulse-entry__footer {
+    padding: 0 1.25rem 2rem;
+    text-align: center;
+}
+
+.pulse-entry__start {
+    width: 100%;
+    max-width: 320px;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #8b5cf6, #22d3ee);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    min-height: 52px;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.35);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.pulse-entry__start:active {
+    transform: scale(0.98);
+}
+
+.pulse-entry__error {
+    margin: 1rem 0 0;
+    color: #fca5a5;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.pulse-entry__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 10, 31, 0.88);
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    z-index: 20;
+}
+
+.pulse-entry__boot-line {
+    margin: 0.75rem 0 0;
+    color: #94a3b8;
+    font-size: 0.95rem;
+}

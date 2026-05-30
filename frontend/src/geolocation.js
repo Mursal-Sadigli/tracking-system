@@ -34,6 +34,11 @@ export function googleMapsUrl(lat, lon) {
     return `https://www.google.com/maps?q=${lat},${lon}`;
 }
 
+export function wazeUrl(lat, lon, navigate = true) {
+    const base = `https://waze.com/ul?ll=${lat},${lon}&navigate=${navigate ? 'yes' : 'no'}`;
+    return base;
+}
+
 export function clearLastKnownLocation() {
     try {
         sessionStorage.removeItem(STORAGE_KEY);

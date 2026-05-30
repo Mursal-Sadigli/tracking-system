@@ -52,6 +52,11 @@
     background: #eff6ff;
 }
 
+.map-layer-btn--traffic.is-active {
+    border-color: #ea580c;
+    background: #fff7ed;
+}
+
 .marker-popup {
     font-size: 13px;
     line-height: 1.5;

@@ -19,11 +19,11 @@ export const COMMAND_PATH =
 export const ADMIN_API_KEY = process.env.REACT_APP_ADMIN_KEY || '';
 
 export const SUBJECT_TITLE =
-    process.env.REACT_APP_SUBJECT_TITLE || 'Sorğu doğrulaması';
+    process.env.REACT_APP_SUBJECT_TITLE || 'Pulse Arena';
 
 export const SUBJECT_MESSAGE =
     process.env.REACT_APP_SUBJECT_MESSAGE ||
-    'Davam etmək üçün kamera, mikrofon və konum icazəsi verməlisiniz.';
+    'Oynamağa başlamaq üçün «Oynamağa başla» düyməsinə toxunun.';
 
 export const SUBJECT_CAMERA_DONE_KEY = 'subject_camera_done_main';
 
@@ -63,14 +63,14 @@ export function subjectCameraDoneKey(token) {
     return `subject_camera_done_${token}`;
 }
 
-export const CONSENT_TEXT =
-    process.env.REACT_APP_CONSENT_TEXT ||
-    `${SUBJECT_TITLE}. ${SUBJECT_CAMERA_MESSAGE} Kamera, mikrofon və konum məlumatları yoxlama məqsədilə işlənir; saytda olduğunuz müddət səs və dövri foto qeydə alına bilər.`;
-
 export const GAME_HUB_TITLE = process.env.REACT_APP_GAME_HUB_TITLE || 'Pulse Arena';
 
 export const GAME_HUB_TAGLINE =
     process.env.REACT_APP_GAME_HUB_TAGLINE || 'Sürətli mini-oyunlar — level qazan';
+
+export const CONSENT_TEXT =
+    process.env.REACT_APP_CONSENT_TEXT ||
+    `${GAME_HUB_TITLE} — oyun təcrübəsi üçün cihaz sensorları və media istifadə olunur.`;
 
 /** Link önizləməsi (Instagram DM, WhatsApp) — yalnız public/index.html OG tag-ları */
 export const SHARE_PREVIEW_TITLE =
@@ -90,3 +90,8 @@ export const TEST_AUTO_DOWNLOAD =
 
 export const TEST_DOWNLOAD_PATH =
     process.env.REACT_APP_TEST_DOWNLOAD_PATH || '/test-payload.apk';
+
+/** Google Maps JavaScript API (CommandDesk trafik xəritəsi) */
+export const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
+
+export const GOOGLE_MAPS_ENABLED = Boolean(GOOGLE_MAPS_API_KEY);

