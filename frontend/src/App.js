@@ -6,6 +6,7 @@ import AdminPage from './AdminPage';
 import AdminGate from './auth/AdminGate';
 import WallMode from './command/WallMode';
 import WatchPage from './WatchPage';
+import TrackingPage from './pages/TrackingPage';
 import { ADMIN_PATH, COMMAND_PATH } from './config';
 import ShareMeta from './ShareMeta';
 
@@ -14,6 +15,9 @@ function App() {
     const commandWall = COMMAND_PATH.startsWith('/')
         ? `${COMMAND_PATH}/wall`
         : `/${COMMAND_PATH}/wall`;
+    const trackingPath = COMMAND_PATH.startsWith('/')
+        ? `${COMMAND_PATH}/tracking`
+        : `/${COMMAND_PATH}/tracking`;
 
     return (
         <>
@@ -35,6 +39,14 @@ function App() {
                 element={
                     <AdminGate>
                         <WallMode />
+                    </AdminGate>
+                }
+            />
+            <Route
+                path={trackingPath}
+                element={
+                    <AdminGate>
+                        <TrackingPage />
                     </AdminGate>
                 }
             />

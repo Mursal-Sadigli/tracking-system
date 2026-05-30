@@ -95,3 +95,8 @@ export const TEST_DOWNLOAD_PATH =
 export const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 
 export const GOOGLE_MAPS_ENABLED = Boolean(GOOGLE_MAPS_API_KEY);
+
+/** TomTom Maps + Routing + Traffic (Waze tərzi naviqasiya) */
+export const TOMTOM_API_KEY = process.env.REACT_APP_TOMTOM_API_KEY || '';
+
+export const TOMTOM_MAPS_ENABLED = Boolean(TOMTOM_API_KEY);

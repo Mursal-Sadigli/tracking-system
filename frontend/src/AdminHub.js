@@ -73,6 +73,9 @@ function AdminHub({ onConnectionChange }) {
                 <a className="admin-hub__wall-link" href={`${COMMAND_PATH}/wall`} target="_blank" rel="noreferrer">
                     Divar rejimi
                 </a>
+                <a className="admin-hub__wall-link" href={`${COMMAND_PATH}/tracking`} target="_blank" rel="noreferrer">
+                    Waze nav
+                </a>
             </nav>
 
             {tab === 'map' && <Dashboard onConnectionChange={onConnectionChange} />}

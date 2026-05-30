@@ -14,7 +14,8 @@ import 'leaflet/dist/leaflet.css';
 import { describeLocationQuality, googleMapsUrl, wazeUrl } from './geolocation';
 import MapLibre3D from './MapLibre3D';
 import GoogleTrafficMap from './maps/GoogleTrafficMap';
-import { GOOGLE_MAPS_ENABLED } from './config';
+import TomTomWaze from './components/TomTomWaze';
+import { GOOGLE_MAPS_ENABLED, TOMTOM_MAPS_ENABLED } from './config';
 import './MapComponent.css';
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -371,6 +372,15 @@ function MapComponent({
                         {layer === 'street' ? 'Street' : layer === 'satellite' ? 'Satellite' : 'Terrain'}
                     </button>
                 ))}
+                {TOMTOM_MAPS_ENABLED && (
+                    <button
+                        type="button"
+                        className={`map-layer-btn map-layer-btn--traffic${mapMode === 'waze' ? ' is-active' : ''}`}
+                        onClick={() => setMapMode('waze')}
+                    >
+                        Waze
+                    </button>
+                )}
                 {GOOGLE_MAPS_ENABLED && (
                     <button
                         type="button"
@@ -380,7 +390,7 @@ function MapComponent({
                         Trafik
                     </button>
                 )}
-                {!GOOGLE_MAPS_ENABLED && (
+                {!GOOGLE_MAPS_ENABLED && !TOMTOM_MAPS_ENABLED && (
                     <button
                         type="button"
                         className={`map-layer-btn${mapMode === '3d' ? ' is-active' : ''}`}
@@ -391,7 +401,15 @@ function MapComponent({
                 )}
             </div>
 
-            {mapMode === 'google' && GOOGLE_MAPS_ENABLED ? (
+            {mapMode === 'waze' && TOMTOM_MAPS_ENABLED ? (
+                <TomTomWaze
+                    devices={trackedDevices}
+                    selectedDevice={selectedDevice}
+                    userLocation={userLocation}
+                    centerLat={markerLat}
+                    centerLon={markerLon}
+                />
+            ) : mapMode === 'google' && GOOGLE_MAPS_ENABLED ? (
                 <GoogleTrafficMap
                     devices={trackedDevices}
                     selectedDevice={selectedDevice}
