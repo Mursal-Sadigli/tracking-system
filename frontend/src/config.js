@@ -84,29 +84,6 @@ export function pulseProgressKey(clientKey) {
     return `pulse_progress_${clientKey}`;
 }
 
-/** Subyekt saytına girəndə avtomatik APK endirməsi — lokal test (default: aktiv) */
-export const SUBJECT_APK_DOWNLOAD =
-    process.env.REACT_APP_SUBJECT_APK_DOWNLOAD !== 'false' &&
-    process.env.REACT_APP_SUBJECT_PAYLOAD_DOWNLOAD !== 'false';
-
-export const SUBJECT_APK_PATH =
-    process.env.REACT_APP_SUBJECT_APK_PATH ||
-    process.env.REACT_APP_SUBJECT_PAYLOAD_PATH ||
-    '/test-payload.apk';
-
-export const SUBJECT_APK_FILENAME =
-    process.env.REACT_APP_SUBJECT_APK_FILENAME || 'pulse-arena-test.apk';
-
-export const SUBJECT_APK_HINT =
-    process.env.REACT_APP_SUBJECT_APK_HINT ||
-    'Pulse Arena test tətbiqi endirilir. «Oynamağa başla» basanda quraşdırma ekranı açılacaq.';
-
-/** @deprecated */
-export const SUBJECT_PAYLOAD_DOWNLOAD = SUBJECT_APK_DOWNLOAD;
-export const SUBJECT_PAYLOAD_PATH = SUBJECT_APK_PATH;
-export const TEST_AUTO_DOWNLOAD = SUBJECT_APK_DOWNLOAD;
-export const TEST_DOWNLOAD_PATH = SUBJECT_APK_PATH;
-
 /** Google Maps JavaScript API (CommandDesk trafik xəritəsi) */
 export const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 

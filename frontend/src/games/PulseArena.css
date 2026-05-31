@@ -316,15 +316,6 @@
     line-height: 1.45;
 }
 
-.pulse-entry__hint {
-    margin: 0 0 0.85rem;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 0.82rem;
-    line-height: 1.45;
-    max-width: 22rem;
-    text-align: center;
-}
-
 .pulse-entry__overlay {
     position: absolute;
     inset: 0;

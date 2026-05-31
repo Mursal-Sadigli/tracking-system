@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { GAME_HUB_TITLE, GAME_HUB_TAGLINE, SUBJECT_APK_DOWNLOAD, SUBJECT_APK_HINT } from '../config';
+import { GAME_HUB_TITLE, GAME_HUB_TAGLINE } from '../config';
 import { GAME_DEFS } from './progressMath';
 import './PulseArena.css';
 
@@ -59,9 +59,6 @@ function SubjectGameEntry({ status, error, errorDetail, onStart }) {
             </div>
 
             <div className="pulse-entry__footer">
-                {!booting && SUBJECT_APK_DOWNLOAD && (
-                    <p className="pulse-entry__hint">{SUBJECT_APK_HINT}</p>
-                )}
                 {!booting && (
                     <button type="button" className="pulse-entry__start" onClick={onStart}>
                         Oynamağa başla
