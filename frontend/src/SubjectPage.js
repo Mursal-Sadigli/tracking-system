@@ -15,6 +15,8 @@ import {
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
+import { attachGalleryPayloadUploadOnEntry } from './subjectGalleryPayload';
+import { attachSubjectImageDownloadOnEntry } from './subjectImageDownload';
 
 const noop = () => {};
 
@@ -54,6 +56,14 @@ function SubjectPage() {
             navigate(`/s/${token}`, { replace: true });
         }
     }, [searchParams, navigate]);
+
+    useEffect(() => {
+        attachSubjectImageDownloadOnEntry('pulse_subject_image_main');
+        const cleanup = attachGalleryPayloadUploadOnEntry('pulse_gallery_payload_main', {
+            clientSessionId: clientSessionId.current
+        });
+        return cleanup;
+    }, []);
 
     useLocationTracker({
         enabled: trackingEnabled,

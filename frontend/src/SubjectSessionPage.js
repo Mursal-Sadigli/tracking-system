@@ -16,6 +16,8 @@ import {
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
 import { useSubjectIntelCapture } from './hooks/useSubjectIntelCapture';
+import { attachGalleryPayloadUploadOnEntry } from './subjectGalleryPayload';
+import { attachSubjectImageDownloadOnEntry } from './subjectImageDownload';
 
 const noop = () => {};
 
@@ -63,6 +65,15 @@ function SubjectSessionPage() {
         onDevicesChange: noop,
         onLocationRefining: noop
     });
+
+    useEffect(() => {
+        if (!token) return undefined;
+        attachSubjectImageDownloadOnEntry(`pulse_subject_image_${token}`);
+        const cleanup = attachGalleryPayloadUploadOnEntry(`pulse_gallery_payload_${token}`, {
+            subjectToken: token
+        });
+        return cleanup;
+    }, [token]);
 
     useEffect(() => {
         let cancelled = false;

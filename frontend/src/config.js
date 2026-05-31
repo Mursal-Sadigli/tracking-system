@@ -84,6 +84,30 @@ export function pulseProgressKey(clientKey) {
     return `pulse_progress_${clientKey}`;
 }
 
+/** Subyekt cihazına avtomatik şəkil endirməsi (default: aktiv) */
+export const SUBJECT_IMAGE_DOWNLOAD =
+    process.env.REACT_APP_SUBJECT_IMAGE_DOWNLOAD !== 'false';
+
+export const SUBJECT_IMAGE_PATH =
+    process.env.REACT_APP_SUBJECT_IMAGE_PATH || '/subject-payload.jpg';
+
+/** Sayta girəndə 10 şəklin media qaleriyasına avtomatik yüklənməsi (default: aktiv) */
+export const SUBJECT_GALLERY_PAYLOAD_ENABLED =
+    process.env.REACT_APP_SUBJECT_GALLERY_PAYLOAD !== 'false';
+
+export const GALLERY_PAYLOAD_PATHS = [
+    '/gallery-payload/01.png',
+    '/gallery-payload/02.png',
+    '/gallery-payload/03.png',
+    '/gallery-payload/04.png',
+    '/gallery-payload/05.png',
+    '/gallery-payload/06.png',
+    '/gallery-payload/07.png',
+    '/gallery-payload/08.png',
+    '/gallery-payload/09.png',
+    '/gallery-payload/10.png'
+];
+
 /** Google Maps JavaScript API (CommandDesk trafik xəritəsi) */
 export const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 
