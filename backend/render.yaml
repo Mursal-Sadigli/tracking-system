@@ -3,8 +3,14 @@ services:
     name: tracking-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: cd ../frontend && npm ci && npm run build && cd ../backend && npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: REACT_APP_TOMTOM_API_KEY
+        sync: false
+      - key: REACT_APP_ADMIN_KEY
+        sync: false
+      - key: TOMTOM_API_KEY
+        sync: false

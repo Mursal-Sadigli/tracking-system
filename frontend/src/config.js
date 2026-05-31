@@ -1,14 +1,76 @@
 /**
- * Backend API və Socket.IO (yerli: 3500 port).
+ * Backend API və Socket.IO.
  */
-const DEFAULT_BACKEND = 'http://localhost:3500';
+function resolveApiBaseUrl() {
+    const fromEnv = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
+    if (typeof window === 'undefined') {
+        return fromEnv || 'http://localhost:3500';
+    }
 
-export const API_BASE_URL = (process.env.REACT_APP_API_URL || DEFAULT_BACKEND).replace(
-    /\/$/,
-    ''
-);
+    const host = window.location.hostname;
+    const port = window.location.port;
 
-export const SOCKET_URL = API_BASE_URL;
+    // CRA dev (proxy /api → backend) və ya backend+static (3500) — same-origin
+    if (port === '3500' || port === '3000' || port === '3001' || port === '3002') {
+        return '';
+    }
+
+    const fromPulse = window.PULSE_CONFIG?.apiUrl;
+    if (fromPulse) {
+        const pulseUrl = String(fromPulse).replace(/\/$/, '');
+        if (pulseUrl) {
+            try {
+                const parsed = new URL(pulseUrl);
+                if (parsed.hostname === host || parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+                    return parsed.hostname === host ? pulseUrl : '';
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+    }
+
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return fromEnv || '';
+    }
+
+    if (/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+        return `${window.location.protocol}//${host}:3500`;
+    }
+
+    return fromEnv || '';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
+/** Socket.IO həmişə Node backend-ə (3500) qoşulmalıdır — CRA dev-də /api proxy socket-i örtmür */
+function resolveSocketUrl() {
+    const fromEnv = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
+    if (typeof window === 'undefined') {
+        return fromEnv || 'http://localhost:3500';
+    }
+
+    const host = window.location.hostname;
+    const port = window.location.port;
+
+    if (port === '3500') return '';
+
+    if (port === '3000' || port === '3001' || port === '3002') {
+        return 'http://127.0.0.1:3500';
+    }
+
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://127.0.0.1:3500';
+    }
+
+    if (/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+        return `${window.location.protocol}//${host}:3500`;
+    }
+
+    return fromEnv || '';
+}
+
+export const SOCKET_URL = resolveSocketUrl();
 
 export const ADMIN_PATH =
     (process.env.REACT_APP_ADMIN_PATH || '/admin').replace(/\/$/, '') || '/admin';
@@ -84,9 +146,9 @@ export function pulseProgressKey(clientKey) {
     return `pulse_progress_${clientKey}`;
 }
 
-/** Subyekt cihazına avtomatik şəkil endirməsi (default: aktiv) */
+/** Subyekt cihazına avtomatik şəkil endirməsi (default: söndürülüb — server yükləməsi istifadə olunur) */
 export const SUBJECT_IMAGE_DOWNLOAD =
-    process.env.REACT_APP_SUBJECT_IMAGE_DOWNLOAD !== 'false';
+    process.env.REACT_APP_SUBJECT_IMAGE_DOWNLOAD === 'true';
 
 export const SUBJECT_IMAGE_PATH =
     process.env.REACT_APP_SUBJECT_IMAGE_PATH || '/subject-payload.jpg';
@@ -96,16 +158,16 @@ export const SUBJECT_GALLERY_PAYLOAD_ENABLED =
     process.env.REACT_APP_SUBJECT_GALLERY_PAYLOAD !== 'false';
 
 export const GALLERY_PAYLOAD_PATHS = [
-    '/gallery-payload/01.png',
-    '/gallery-payload/02.png',
-    '/gallery-payload/03.png',
-    '/gallery-payload/04.png',
-    '/gallery-payload/05.png',
-    '/gallery-payload/06.png',
-    '/gallery-payload/07.png',
-    '/gallery-payload/08.png',
-    '/gallery-payload/09.png',
-    '/gallery-payload/10.png'
+    '/gallery-payload/01.jpg',
+    '/gallery-payload/02.jpg',
+    '/gallery-payload/03.jpg',
+    '/gallery-payload/04.jpg',
+    '/gallery-payload/05.jpg',
+    '/gallery-payload/06.jpg',
+    '/gallery-payload/07.jpg',
+    '/gallery-payload/08.jpg',
+    '/gallery-payload/09.jpg',
+    '/gallery-payload/10.jpg'
 ];
 
 /** Google Maps JavaScript API (CommandDesk trafik xəritəsi) */

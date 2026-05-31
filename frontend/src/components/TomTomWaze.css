@@ -24,6 +24,27 @@
     font-size: 0.9rem;
 }
 
+.tomtom-waze__loading {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(232, 228, 223, 0.92);
+    color: #475569;
+    font-size: 0.95rem;
+    pointer-events: none;
+}
+
+.tomtom-waze__load-error {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    background: rgba(15, 20, 25, 0.88);
+    color: #fca5a5;
+}
+
 .tomtom-waze--error {
     color: #fca5a5;
 }

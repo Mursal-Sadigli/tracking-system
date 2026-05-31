@@ -624,6 +624,21 @@ app.use(
 );
 app.use('/api/media', createMediaRouter({ io, requireAdminKey }));
 
+const frontendPublicPath = path.join(__dirname, '..', 'frontend', 'public');
+const galleryPublicPath = path.join(frontendPublicPath, 'gallery-payload');
+if (fs.existsSync(galleryPublicPath)) {
+    app.use('/gallery-payload', express.static(galleryPublicPath, { maxAge: '5m' }));
+}
+
+const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
+if (fs.existsSync(path.join(frontendBuildPath, 'index.html'))) {
+    app.use(express.static(frontendBuildPath, { index: false, maxAge: '1h' }));
+    app.get(/^(?!\/api(?:\/|$)|\/socket\.io|\/health).*/, (req, res) => {
+        res.sendFile(path.join(frontendBuildPath, 'index.html'));
+    });
+    console.log(`🖥️ Frontend static: ${frontendBuildPath}`);
+}
+
 // ============ WEBSOCKET (Real-time) ============
 const briefingWorker = startBriefingWorker(io, { activeDevices, deviceHistory });
 

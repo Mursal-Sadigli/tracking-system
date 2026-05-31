@@ -19,7 +19,9 @@
     "web-vitals": "^5.2.0"
   },
   "scripts": {
+    "prestart": "node scripts/generate-pulse-config.js",
     "start": "react-scripts start",
+    "prebuild": "node scripts/generate-pulse-config.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

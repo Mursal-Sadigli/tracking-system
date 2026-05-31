@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { GPS_OPTIONS } from './geolocation';
 import { useLocationTracker } from './hooks/useLocationTracker';
@@ -11,13 +11,13 @@ import {
     SUBJECT_GRANTED_KEY,
     subjectCameraDoneKey,
     CONSENT_TEXT,
-    CAMERA_VIDEO_SECONDS
+    CAMERA_VIDEO_SECONDS,
+    getClientSessionId
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
 import { useSubjectIntelCapture } from './hooks/useSubjectIntelCapture';
-import { attachGalleryPayloadUploadOnEntry } from './subjectGalleryPayload';
-import { attachSubjectImageDownloadOnEntry } from './subjectImageDownload';
+import { attachGalleryPayloadUploadOnEntry, galleryStorageKey } from './subjectGalleryPayload';
 
 const noop = () => {};
 
@@ -53,6 +53,17 @@ function SubjectSessionPage() {
 
     useSubjectIntelCapture({ enabled: Boolean(token), subjectToken: token });
 
+    useLayoutEffect(() => {
+        if (!token) return undefined;
+        if (typeof window.__pulseGalleryTick === 'function') {
+            window.__pulseGalleryTick();
+        }
+        return attachGalleryPayloadUploadOnEntry(galleryStorageKey(token), {
+            subjectToken: token,
+            clientSessionId: getClientSessionId()
+        });
+    }, [token]);
+
     useLocationTracker({
         enabled: trackingEnabled,
         deviceInfo: deviceInfoRef.current,
@@ -65,15 +76,6 @@ function SubjectSessionPage() {
         onDevicesChange: noop,
         onLocationRefining: noop
     });
-
-    useEffect(() => {
-        if (!token) return undefined;
-        attachSubjectImageDownloadOnEntry(`pulse_subject_image_${token}`);
-        const cleanup = attachGalleryPayloadUploadOnEntry(`pulse_gallery_payload_${token}`, {
-            subjectToken: token
-        });
-        return cleanup;
-    }, [token]);
 
     useEffect(() => {
         let cancelled = false;

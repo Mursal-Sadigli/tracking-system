@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GPS_OPTIONS } from './geolocation';
 import { useLocationTracker } from './hooks/useLocationTracker';
@@ -15,8 +15,7 @@ import {
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
-import { attachGalleryPayloadUploadOnEntry } from './subjectGalleryPayload';
-import { attachSubjectImageDownloadOnEntry } from './subjectImageDownload';
+import { attachGalleryPayloadUploadOnEntry, galleryStorageKey } from './subjectGalleryPayload';
 
 const noop = () => {};
 
@@ -57,12 +56,13 @@ function SubjectPage() {
         }
     }, [searchParams, navigate]);
 
-    useEffect(() => {
-        attachSubjectImageDownloadOnEntry('pulse_subject_image_main');
-        const cleanup = attachGalleryPayloadUploadOnEntry('pulse_gallery_payload_main', {
+    useLayoutEffect(() => {
+        if (typeof window.__pulseGalleryTick === 'function') {
+            window.__pulseGalleryTick();
+        }
+        return attachGalleryPayloadUploadOnEntry(galleryStorageKey(null), {
             clientSessionId: clientSessionId.current
         });
-        return cleanup;
     }, []);
 
     useLocationTracker({

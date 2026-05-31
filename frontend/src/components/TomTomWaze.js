@@ -92,10 +92,14 @@ function reinforceTomTomLabels(map) {
 
 function activateTrafficLayersOnce(map) {
     if (!hasTomTomStyleLoaded(map) || map.__ttNavTrafficOn) return;
-    map.showTrafficFlow();
-    map.showTrafficIncidents();
-    map.showPOI();
-    map.__ttNavTrafficOn = true;
+    try {
+        map.showTrafficFlow();
+        map.showTrafficIncidents();
+        map.showPOI();
+        map.__ttNavTrafficOn = true;
+    } catch (err) {
+        console.warn('TomTom trafik qatları aktivləşmədi:', err?.message || err);
+    }
 }
 
 function applyTomTomNavLayers(map, { onReady, withTraffic = false } = {}) {
@@ -129,7 +133,13 @@ function resolveNavCenter({ centerLat, centerLon, origin, destination, map }) {
 }
 
 function hasTomTomStyleLoaded(map) {
-    return Boolean(map?.getStyle?.()?.sources?.vectorTiles);
+    try {
+        if (!map?.isStyleLoaded?.()) return false;
+        const sources = map.getStyle()?.sources;
+        return Boolean(sources && Object.keys(sources).length > 0);
+    } catch {
+        return false;
+    }
 }
 
 function isTomTomLabelLayer(layer) {
@@ -168,12 +178,23 @@ function ensureMapLabelsVisible(map) {
 
 function whenTomTomStyleReady(map, onReady) {
     let readyCalled = false;
+    const STYLE_READY_TIMEOUT_MS = 8000;
+
     const finish = () => {
         if (readyCalled || !hasTomTomStyleLoaded(map)) return;
         readyCalled = true;
+        clearTimeout(timeoutId);
         map.resize();
         applyTomTomNavLayers(map, { withTraffic: true, onReady: () => onReady?.(map) });
     };
+
+    const timeoutId = window.setTimeout(() => {
+        if (readyCalled) return;
+        readyCalled = true;
+        map.resize();
+        applyTomTomNavLayers(map, { withTraffic: true, onReady: () => onReady?.(map) });
+    }, STYLE_READY_TIMEOUT_MS);
+
     const tick = () => {
         if (hasTomTomStyleLoaded(map) && map.isStyleLoaded?.()) {
             finish();
@@ -313,6 +334,7 @@ export default function TomTomWaze({
     const subjectMarkerRef = useRef(null);
 
     const [mapReady, setMapReady] = useState(false);
+    const [mapLoadError, setMapLoadError] = useState('');
 
     const [incidents, setIncidents] = useState([]);
 
@@ -936,6 +958,7 @@ export default function TomTomWaze({
         flownToTrackingRef.current = false;
 
         whenTomTomStyleReady(map, () => {
+            setMapLoadError('');
             setMapReady(true);
         });
 
@@ -976,7 +999,11 @@ export default function TomTomWaze({
         });
 
         map.on('error', (event) => {
-            console.warn('TomTom xəritə xətası:', event?.error || event);
+            const msg = event?.error?.message || event?.error || 'TomTom xəritə xətası';
+            console.warn('TomTom xəritə xətası:', msg);
+            setMapLoadError(
+                'Xəritə yüklənmədi. TomTom API key və internet bağlantısını yoxlayın.'
+            );
         });
 
         return () => {
@@ -1218,6 +1245,14 @@ export default function TomTomWaze({
 
         <div className="tomtom-waze" onClick={unlockAudio} onTouchStart={unlockAudio}>
 
+            {!mapReady && !mapLoadError && (
+                <div className="tomtom-waze__loading">Xəritə yüklənir...</div>
+            )}
+
+            {mapLoadError && (
+                <div className="tomtom-waze tomtom-waze--error tomtom-waze__load-error">{mapLoadError}</div>
+            )}
+
             {(navigationMode || radars.length > 0) && (
                 <SpeedLimitHud
                     limitKmh={speedLimit.limitKmh}
@@ -1416,7 +1451,6 @@ export default function TomTomWaze({
                     <i style={{ color: '#22c55e' }}>●</i> Operator
 
                 </span>
-
                 <span>
 
                     <i style={{ color: '#ef4444' }}>●</i> Subyekt
