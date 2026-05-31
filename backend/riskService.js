@@ -52,6 +52,9 @@ function pushSnapshot(caseId, entry) {
         model_version: entry.model_version || null,
         explanations: entry.explanations || [],
         baseline: entry.baseline || null,
+        forecast: entry.forecast || null,
+        ensemble: entry.ensemble || null,
+        fusion: entry.fusion || null,
         history
     };
     persist();
@@ -89,14 +92,20 @@ async function maybeUpdateRisk(io, caseId, deviceId, history, mlContext = {}, ca
     let model_version = null;
     let explanations = [];
     let baseline = null;
+    let forecast = null;
+    let ensemble = null;
+    let fusion = null;
 
     if (mlResult && typeof mlResult.risk_score === 'number') {
         score = mlResult.risk_score;
         risk_level = mlResult.risk_level || riskLevelFromScore(score);
         anomalies_count = (mlResult.anomalies || []).length;
-        model_version = mlResult.model_version || 'v1';
+        model_version = mlResult.model_version || 'v2';
         explanations = mlResult.explanations || [];
         baseline = mlResult.baseline || null;
+        forecast = mlResult.forecast || null;
+        ensemble = mlResult.ensemble || null;
+        fusion = mlResult.fusion || null;
         saveMlSnapshot(caseId, { ...mlResult, device_id: deviceId });
     } else {
         const batch = await runAnalyticsBatch(history, {
@@ -115,7 +124,10 @@ async function maybeUpdateRisk(io, caseId, deviceId, history, mlContext = {}, ca
         anomalies_count,
         model_version,
         explanations,
-        baseline
+        baseline,
+        forecast,
+        ensemble,
+        fusion
     });
 
     if (io) {
@@ -128,7 +140,10 @@ async function maybeUpdateRisk(io, caseId, deviceId, history, mlContext = {}, ca
             history: snapshot.history,
             model_version,
             ml_explanations: explanations,
-            baseline
+            baseline,
+            forecast,
+            ensemble,
+            fusion
         });
     }
 

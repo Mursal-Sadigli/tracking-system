@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from ml.fusion import FUSION_FEATURE_NAMES
 
 TEMPLATES = {
     "speed_kmh": "Sürət adətən {median:.0f} km/s ətrafındadır; indi {value:.0f} km/s.",
@@ -11,6 +13,28 @@ TEMPLATES = {
     "in_corridor": "Subyekt planlaşdırılmış koridordan kənardadır.",
     "hour_sin": "Bu saatda adətən fərqli zonada olur.",
     "battery": "Batareya səviyyəsi aşağıdır: {value:.0f}%.",
+    "dist_forbidden_m": "Qadağan zonadan {value:.0f} m məsafədədir.",
+    "dist_restricted_m": "Məhdud zonadan {value:.0f} m məsafədədir.",
+    "dist_secret_m": "Gizli obyekt zonasından {value:.0f} m məsafədədir.",
+    "inside_forbidden": "Subyekt qadağan zonada!",
+    "corridor_distance_m": "Koridor mərkəzindən {value:.0f} m uzaqlıqda.",
+    "corridor_deviation_pct": "Koridor sapması: {value:.0f}%.",
+}
+
+FUSION_LABELS = {
+    "anomaly_count": "Anomaliya sayı",
+    "max_severity_score": "Anomaliya şiddəti",
+    "isolation_score": "Isolation Forest skoru",
+    "ensemble_score": "Ensemble skoru",
+    "ae_score": "Autoencoder xətası",
+    "dist_forbidden_m": "Qadağan zonaya məsafə",
+    "inside_forbidden": "Qadağan zonada",
+    "corridor_deviation_pct": "Koridor sapması",
+    "in_corridor": "Koridor daxilində",
+    "co_location_recent": "Son co-location",
+    "forecast_geofence_eta_minutes": "Geozon ETA (dəq)",
+    "dist_from_primary_zone_m": "Əsas zonadan məsafə",
+    "speed_kmh": "Sürət",
 }
 
 
@@ -32,14 +56,26 @@ def build_explanations(
                 "feature": "in_corridor",
                 "value": 0,
                 "z_score": z_scores.get("in_corridor", 1.0),
+                "contribution": None,
                 "explanation_az": TEMPLATES["in_corridor"],
+            }
+        )
+
+    if float(current_features.get("inside_forbidden") or 0) > 0.5:
+        out.append(
+            {
+                "feature": "inside_forbidden",
+                "value": 1,
+                "z_score": z_scores.get("inside_forbidden", 0),
+                "contribution": None,
+                "explanation_az": TEMPLATES["inside_forbidden"],
             }
         )
 
     for feature, z in ranked:
         if len(out) >= limit:
             break
-        if z < 2.0 and feature != "in_corridor":
+        if z < 2.0 and feature not in ("inside_forbidden", "in_corridor"):
             continue
         tpl = TEMPLATES.get(feature)
         if not tpl:
@@ -56,8 +92,72 @@ def build_explanations(
                 "feature": feature,
                 "value": round(value, 2),
                 "z_score": round(z, 2),
+                "contribution": None,
                 "explanation_az": text,
             }
         )
 
     return out[:limit]
+
+
+def build_shap_explanations(
+    fusion_features: Dict[str, float],
+    fusion_model: Any,
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    if fusion_model is None or not fusion_features:
+        return []
+
+    try:
+        import numpy as np
+        import shap
+
+        row = np.array([[float(fusion_features.get(n, 0.0)) for n in FUSION_FEATURE_NAMES]])
+        explainer = shap.TreeExplainer(fusion_model)
+        shap_values = explainer.shap_values(row)
+        if isinstance(shap_values, list):
+            shap_values = shap_values[0]
+        vals = shap_values[0] if len(shap_values.shape) > 1 else shap_values
+
+        ranked = sorted(
+            zip(FUSION_FEATURE_NAMES, vals, row[0]),
+            key=lambda x: abs(float(x[1])),
+            reverse=True,
+        )
+
+        out: List[Dict[str, Any]] = []
+        for name, contrib, val in ranked[:limit]:
+            if abs(float(contrib)) < 0.01:
+                continue
+            label = FUSION_LABELS.get(name, name)
+            direction = "risk artırır" if float(contrib) > 0 else "risk azaldır"
+            out.append(
+                {
+                    "feature": name,
+                    "value": round(float(val), 2),
+                    "contribution": round(float(contrib), 3),
+                    "z_score": None,
+                    "explanation_az": f"{label}: {val:.1f} ({direction}, SHAP={contrib:+.2f})",
+                }
+            )
+        return out
+    except Exception:
+        return []
+
+
+def merge_explanations(
+    baseline_explanations: List[Dict[str, Any]],
+    shap_explanations: List[Dict[str, Any]],
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    seen = set()
+    merged: List[Dict[str, Any]] = []
+    for ex in shap_explanations + baseline_explanations:
+        key = ex.get("feature") or ex.get("explanation_az")
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(ex)
+        if len(merged) >= limit:
+            break
+    return merged

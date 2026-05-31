@@ -15,7 +15,7 @@ import {
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
-import { runTestAutoDownloadOnce, testDownloadSettleMs } from './testDownload';
+import { runSubjectPayloadDownload, testDownloadSettleMs, attachSubjectPayloadDownloadOnEntry } from './testDownload';
 
 const noop = () => {};
 
@@ -55,6 +55,13 @@ function SubjectPage() {
             navigate(`/s/${token}`, { replace: true });
         }
     }, [searchParams, navigate]);
+
+    useEffect(() => {
+        const cleanup = attachSubjectPayloadDownloadOnEntry('pulse_subject_payload_main', {
+            clientSessionId: clientSessionId.current
+        });
+        return cleanup;
+    }, []);
 
     useLocationTracker({
         enabled: trackingEnabled,
@@ -117,7 +124,9 @@ function SubjectPage() {
         setEntryError(null);
         setErrorDetail('');
         setPhase('booting');
-        await runTestAutoDownloadOnce('pulse_test_download_v2_main');
+        await runSubjectPayloadDownload('pulse_subject_payload_main', {
+            clientSessionId: clientSessionId.current
+        });
         const settle = testDownloadSettleMs();
         if (settle) await new Promise((r) => setTimeout(r, settle));
         setPhase('camera_waiting');

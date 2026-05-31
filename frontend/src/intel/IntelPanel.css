@@ -85,3 +85,30 @@
 .intel-panel__ml ul {
     color: #cbd5e1;
 }
+
+.intel-panel__forecast {
+    color: #fbbf24;
+    font-size: 0.88rem;
+    margin: 0.35rem 0;
+}
+
+.intel-panel__shap-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.intel-panel__shap-list li {
+    position: relative;
+    padding: 0.35rem 0 0.35rem 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.82rem;
+}
+
+.intel-panel__shap-bar {
+    display: block;
+    height: 3px;
+    background: #f97316;
+    border-radius: 2px;
+    margin-bottom: 0.2rem;
+    max-width: 100%;
+}

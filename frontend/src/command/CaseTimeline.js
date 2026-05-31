@@ -1,4 +1,5 @@
 import React from 'react';
+import { zoneTypeMeta } from '../utils/geofenceConstants';
 
 const LABELS = {
     consent_granted: 'İcazə verildi',
@@ -22,17 +23,40 @@ function CaseTimeline({ events }) {
 
     return (
         <ul className="case-timeline">
-            {events.map((ev) => (
-                <li key={ev.id} className={`case-timeline__item case-timeline__item--${ev.type}`}>
-                    <span className="case-timeline__time">
-                        {new Date(ev.ts).toLocaleTimeString('az-AZ')}
-                    </span>
-                    <span className="case-timeline__label">{LABELS[ev.type] || ev.type}</span>
-                    {ev.payload?.speed_kmh != null && (
-                        <span className="case-timeline__meta">{ev.payload.speed_kmh} km/s</span>
-                    )}
-                </li>
-            ))}
+            {events.map((ev) => {
+                const zoneType = ev.payload?.zone_type;
+                const zoneMeta = zoneType ? zoneTypeMeta(zoneType) : null;
+                const itemClass = [
+                    'case-timeline__item',
+                    `case-timeline__item--${ev.type}`,
+                    zoneType ? `case-timeline__item--${zoneType}` : ''
+                ]
+                    .filter(Boolean)
+                    .join(' ');
+
+                return (
+                    <li key={ev.id} className={itemClass}>
+                        <span className="case-timeline__time">
+                            {new Date(ev.ts).toLocaleTimeString('az-AZ')}
+                        </span>
+                        <span className="case-timeline__label">
+                            {zoneMeta && (ev.type === 'geofence_enter' || ev.type === 'geofence_exit')
+                                ? `${zoneMeta.emoji} `
+                                : ''}
+                            {LABELS[ev.type] || ev.type}
+                        </span>
+                        {ev.payload?.geofence && (
+                            <span className="case-timeline__meta">
+                                {ev.payload.geofence}
+                                {zoneMeta ? ` • ${zoneMeta.label}` : ''}
+                            </span>
+                        )}
+                        {ev.payload?.speed_kmh != null && (
+                            <span className="case-timeline__meta">{ev.payload.speed_kmh} km/s</span>
+                        )}
+                    </li>
+                );
+            })}
         </ul>
     );
 }

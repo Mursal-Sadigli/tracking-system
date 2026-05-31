@@ -81,9 +81,17 @@ function IntelPanel({ selectedCaseId, onRoutineZones }) {
                     history: payload.history || prev?.history || [],
                     model_version: payload.model_version,
                     explanations: payload.ml_explanations || prev?.explanations || [],
-                    baseline: payload.baseline || prev?.baseline
+                    baseline: payload.baseline || prev?.baseline,
+                    forecast: payload.forecast || prev?.forecast,
+                    ensemble: payload.ensemble || prev?.ensemble,
+                    fusion: payload.fusion || prev?.fusion
                 }));
-                if (payload.ml_explanations?.length || payload.baseline) {
+                if (
+                    payload.ml_explanations?.length ||
+                    payload.baseline ||
+                    payload.forecast ||
+                    payload.ensemble
+                ) {
                     setMlIntel((prev) => ({
                         ...prev,
                         case_id: payload.case_id,
@@ -92,7 +100,10 @@ function IntelPanel({ selectedCaseId, onRoutineZones }) {
                         baseline: payload.baseline,
                         updated_at: payload.updated_at,
                         risk_score: payload.score,
-                        risk_level: payload.risk_level
+                        risk_level: payload.risk_level,
+                        forecast: payload.forecast,
+                        ensemble: payload.ensemble,
+                        fusion: payload.fusion
                     }));
                 }
             }
@@ -155,12 +166,65 @@ function IntelPanel({ selectedCaseId, onRoutineZones }) {
                                   ? ` | Öyrənir (${mlIntel.baseline.points_seen || 0}/${mlIntel.baseline.min_points || 50})`
                                   : ''}
                         </p>
+                        {(risk?.forecast?.geofence_eta_minutes != null ||
+                            mlIntel?.forecast?.geofence_eta_minutes != null) && (
+                            <p className="intel-panel__forecast">
+                                Proqnoz:{' '}
+                                {mlIntel?.forecast?.approaching_zone_name ||
+                                    risk?.forecast?.approaching_zone_name ||
+                                    'Geozon'}
+                                ~{' '}
+                                {Math.round(
+                                    mlIntel?.forecast?.geofence_eta_minutes ??
+                                        risk?.forecast?.geofence_eta_minutes
+                                )}{' '}
+                                dəq
+                            </p>
+                        )}
+                        {(mlIntel?.ensemble || risk?.ensemble) && (
+                            <p className="intel-panel__meta">
+                                Ensemble — IF:{' '}
+                                {Number(
+                                    mlIntel?.ensemble?.if_score ?? risk?.ensemble?.if_score ?? 0
+                                ).toFixed(2)}
+                                , AE:{' '}
+                                {Number(
+                                    mlIntel?.ensemble?.ae_score ?? risk?.ensemble?.ae_score ?? 0
+                                ).toFixed(2)}
+                                , cəm:{' '}
+                                {Number(
+                                    mlIntel?.ensemble?.ensemble_score ??
+                                        risk?.ensemble?.ensemble_score ??
+                                        0
+                                ).toFixed(2)}
+                            </p>
+                        )}
+                        {(mlIntel?.fusion || risk?.fusion) && (
+                            <p className="intel-panel__meta">
+                                Fusion — qayda: {mlIntel?.fusion?.rule_score ?? risk?.fusion?.rule_score}
+                                , XGB: {mlIntel?.fusion?.xgb_score ?? risk?.fusion?.xgb_score}, nəticə:{' '}
+                                {mlIntel?.fusion?.blended_score ?? risk?.fusion?.blended_score}
+                            </p>
+                        )}
                         {(risk?.explanations?.length > 0 || mlIntel?.explanations?.length > 0) && (
                             <>
-                                <h5>Risk səbəbləri</h5>
-                                <ul>
+                                <h5>Risk səbəbləri (SHAP + baseline)</h5>
+                                <ul className="intel-panel__shap-list">
                                     {(risk?.explanations || mlIntel?.explanations || []).map((ex, i) => (
-                                        <li key={ex.feature || i}>{ex.explanation_az}</li>
+                                        <li key={ex.feature || i}>
+                                            {ex.contribution != null && (
+                                                <span
+                                                    className="intel-panel__shap-bar"
+                                                    style={{
+                                                        width: `${Math.min(
+                                                            100,
+                                                            Math.abs(ex.contribution) * 40
+                                                        )}%`
+                                                    }}
+                                                />
+                                            )}
+                                            {ex.explanation_az}
+                                        </li>
                                     ))}
                                 </ul>
                             </>

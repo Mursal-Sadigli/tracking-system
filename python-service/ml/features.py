@@ -4,6 +4,9 @@ import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from ml.geo_context import summarize_geofences
+from ml.geo_utils import haversine_meters
+
 FEATURE_NAMES = [
     "speed_kmh",
     "heading_delta",
@@ -16,17 +19,13 @@ FEATURE_NAMES = [
     "dt_seconds",
     "in_corridor",
     "is_moving",
+    "dist_forbidden_m",
+    "dist_restricted_m",
+    "dist_secret_m",
+    "inside_forbidden",
+    "corridor_distance_m",
+    "corridor_deviation_pct",
 ]
-
-
-def haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    r = 6371000
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * r * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def _parse_hour(ts: Any) -> float:
@@ -91,6 +90,10 @@ def extract_point_features(
     hour = _parse_hour(point.get("timestamp"))
     hour_rad = hour / 24.0 * 2 * math.pi
 
+    geo = summarize_geofences(lat, lon, ctx.get("geofences") or [])
+    corridor_dist = float(ctx.get("corridor_distance_m") or 0)
+    corridor_dev = float(ctx.get("deviation_score") or 0)
+
     return {
         "speed_kmh": speed_kmh,
         "heading_delta": heading_delta,
@@ -103,6 +106,12 @@ def extract_point_features(
         "dt_seconds": dt_seconds,
         "in_corridor": 1.0 if ctx.get("in_corridor", True) else 0.0,
         "is_moving": 1.0 if point.get("is_moving") else 0.0,
+        "dist_forbidden_m": geo["dist_forbidden_m"],
+        "dist_restricted_m": geo["dist_restricted_m"],
+        "dist_secret_m": geo["dist_secret_m"],
+        "inside_forbidden": geo["inside_forbidden"],
+        "corridor_distance_m": corridor_dist,
+        "corridor_deviation_pct": corridor_dev,
     }
 
 

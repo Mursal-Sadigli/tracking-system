@@ -23,6 +23,7 @@ const { buildZoneSnapshot } = require('./areaProviders');
 const subjectIntel = require('./subjectIntel');
 const { lookupIp } = require('./ipLookup');
 const { getMlSnapshot } = require('./mlService');
+const { getRadarsInBbox, getSpeedLimitAt, parseBboxParam } = require('./navOverpass');
 
 function createApiRouter({ activeDevices, deviceHistory, requireAdminKey, io }) {
     const router = express.Router();
@@ -259,23 +260,58 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey, io }) 
         res.json({ heatmap: buildHeatmapFromHistories(histories) });
     });
 
+    const VALID_ZONE_TYPES = new Set(['forbidden', 'restricted', 'secret']);
+
     router.get('/geofences', admin, (req, res) => {
-        res.json({
-            geofences: Array.from(store.geofences.values())
-        });
+        let list = Array.from(store.geofences.values());
+        if (req.query.case_id) {
+            list = list.filter((f) => f.case_id === req.query.case_id);
+        }
+        res.json({ geofences: list });
     });
 
     router.post('/geofences', admin, (req, res) => {
+        const zoneType = VALID_ZONE_TYPES.has(req.body.zone_type)
+            ? req.body.zone_type
+            : 'restricted';
+        if (!req.body.polygon || req.body.polygon.length < 3) {
+            return res.status(400).json({ error: 'polygon (min 3 nöqtə) tələb olunur' });
+        }
         const id = req.body.id || `gf_${Date.now()}`;
         const fence = {
             id,
-            case_id: req.body.case_id,
+            case_id: req.body.case_id || null,
             name: req.body.name || 'Zona',
-            polygon: req.body.polygon
+            zone_type: zoneType,
+            polygon: req.body.polygon,
+            created_at: new Date().toISOString()
         };
         store.geofences.set(id, fence);
         require('./store').persist();
         res.status(201).json(fence);
+    });
+
+    router.patch('/geofences/:id', admin, (req, res) => {
+        const fence = store.geofences.get(req.params.id);
+        if (!fence) return res.status(404).json({ error: 'Tapılmadı' });
+        if (req.body.name != null) fence.name = req.body.name;
+        if (req.body.case_id !== undefined) fence.case_id = req.body.case_id;
+        if (req.body.polygon != null) {
+            if (req.body.polygon.length < 3) {
+                return res.status(400).json({ error: 'polygon min 3 nöqtə olmalıdır' });
+            }
+            fence.polygon = req.body.polygon;
+        }
+        if (req.body.zone_type != null) {
+            if (!VALID_ZONE_TYPES.has(req.body.zone_type)) {
+                return res.status(400).json({ error: 'zone_type: forbidden | restricted | secret' });
+            }
+            fence.zone_type = req.body.zone_type;
+        }
+        fence.updated_at = new Date().toISOString();
+        store.geofences.set(fence.id, fence);
+        require('./store').persist();
+        res.json(fence);
     });
 
     router.delete('/geofences/:id', admin, (req, res) => {
@@ -441,6 +477,33 @@ function createApiRouter({ activeDevices, deviceHistory, requireAdminKey, io }) 
         if (!zone) return res.status(404).json({ error: 'not_found' });
         watchZones.setExternalIngest(req.params.id, req.body.devices || []);
         res.json({ ok: true, count: (req.body.devices || []).length });
+    });
+
+    router.get('/nav/radars', admin, async (req, res) => {
+        const bbox = parseBboxParam(req.query.bbox);
+        if (!bbox) {
+            return res.status(400).json({ error: 'invalid_bbox', hint: 'bbox=minLon,minLat,maxLon,maxLat' });
+        }
+        try {
+            const radars = await getRadarsInBbox(bbox.minLon, bbox.minLat, bbox.maxLon, bbox.maxLat);
+            res.json({ radars });
+        } catch (err) {
+            res.status(502).json({ error: 'overpass_failed', message: err?.message });
+        }
+    });
+
+    router.get('/nav/speed-limit', admin, async (req, res) => {
+        const lat = Number(req.query.lat);
+        const lon = Number(req.query.lon);
+        if (Number.isNaN(lat) || Number.isNaN(lon)) {
+            return res.status(400).json({ error: 'invalid_coordinates' });
+        }
+        try {
+            const result = await getSpeedLimitAt(lat, lon);
+            res.json(result);
+        } catch (err) {
+            res.status(502).json({ error: 'speed_limit_failed', message: err?.message });
+        }
     });
 
     return router;

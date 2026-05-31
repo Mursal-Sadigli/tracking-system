@@ -1,0 +1,122 @@
+.speed-limit-hud {
+    position: absolute;
+    z-index: 6;
+    right: 12px;
+    bottom: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    pointer-events: none;
+}
+
+.speed-limit-hud__sign {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 3px solid #ef4444;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.speed-limit-hud__label {
+    font-size: 0.45rem;
+    font-weight: 800;
+    color: #64748b;
+    letter-spacing: 0.04em;
+    line-height: 1;
+}
+
+.speed-limit-hud__value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+}
+
+.speed-limit-hud__current {
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    background: rgba(15, 20, 25, 0.88);
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    text-align: center;
+    min-width: 52px;
+}
+
+.speed-limit-hud__current-val {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.speed-limit-hud__unit {
+    font-size: 0.6rem;
+    color: #94a3b8;
+}
+
+.speed-limit-hud--over .speed-limit-hud__sign {
+    border-color: #dc2626;
+    animation: speedLimitPulse 1s ease infinite;
+}
+
+.speed-limit-hud--over .speed-limit-hud__current {
+    background: rgba(127, 29, 29, 0.92);
+    border-color: #ef4444;
+    color: #fecaca;
+}
+
+@keyframes speedLimitPulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+}
+
+.tomtom-radar-marker {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    background: rgba(15, 20, 25, 0.92);
+    border: 2px solid #a855f7;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+}
+
+.tomtom-radar-marker__icon {
+    line-height: 1;
+}
+
+.tomtom-waze__radar-toggle {
+    margin-left: auto;
+    padding: 0.28rem 0.55rem;
+    border-radius: 8px;
+    border: 1px solid #475569;
+    background: rgba(30, 41, 59, 0.95);
+    color: #94a3b8;
+    font-size: 0.68rem;
+    cursor: pointer;
+}
+
+.tomtom-waze__radar-toggle.is-on {
+    border-color: #a855f7;
+    color: #e9d5ff;
+}
+
+@media (max-width: 480px) {
+    .speed-limit-hud {
+        bottom: 120px;
+    }
+}

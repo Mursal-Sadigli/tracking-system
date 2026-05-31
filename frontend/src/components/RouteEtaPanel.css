@@ -1,0 +1,118 @@
+.route-eta-panel {
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #e2e8f0;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.route-eta-panel--compact {
+    padding: 0.65rem;
+    font-size: 0.78rem;
+}
+
+.route-eta-panel--error {
+    color: #fca5a5;
+    border-color: rgba(248, 113, 113, 0.4);
+}
+
+.route-eta-panel__title {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.route-eta-panel__arrival {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    margin-bottom: 0.35rem;
+}
+
+.route-eta-panel__arrival strong {
+    display: block;
+    font-size: 1rem;
+    color: #34d399;
+}
+
+.route-eta-panel__meta {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.78rem;
+    margin-top: 0.1rem;
+}
+
+.route-eta-panel__delay {
+    margin: 0.25rem 0 0.5rem;
+    color: #fbbf24;
+}
+
+.route-eta-panel__hint {
+    margin: 0 0 0.5rem;
+    color: #94a3b8;
+}
+
+.route-eta-panel__error {
+    margin: 0.25rem 0 0.5rem;
+    color: #fca5a5;
+}
+
+.route-eta-panel__icon {
+    flex-shrink: 0;
+}
+
+.route-eta-panel__alt-label {
+    margin: 0.5rem 0 0.35rem;
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+
+.route-eta-panel__routes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.route-eta-panel__route-btn {
+    text-align: left;
+    padding: 0.4rem 0.55rem;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: rgba(30, 41, 59, 0.7);
+    color: #cbd5e1;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.route-eta-panel__route-btn.is-active {
+    border-color: #22d3ee;
+    background: rgba(34, 211, 238, 0.12);
+    color: #e0f2fe;
+}
+
+.route-eta-panel__route-btn.is-empty {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.route-eta-panel__route-btn:not(.is-empty):hover {
+    border-color: #475569;
+}
+
+.command-desk__detail .route-eta-panel {
+    margin: 0.75rem 0;
+}
+
+.tomtom-waze__hud .route-eta-panel {
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.tomtom-waze__hud .route-eta-panel__title {
+    display: none;
+}

@@ -24,8 +24,14 @@
     color: #fff;
 }
 
-.admin-hub__wall-link {
+.admin-hub__external-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-left: auto;
+}
+
+.admin-hub__wall-link {
     background: #0f766e;
 }
 

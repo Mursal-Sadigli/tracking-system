@@ -3,13 +3,14 @@
     width: 100%;
     height: 100%;
     min-height: inherit;
-    background: #0f1419;
+    background: #e8e4df;
 }
 
 .tomtom-waze__map {
     width: 100%;
     height: 100%;
     min-height: inherit;
+    background: #e8e4df;
 }
 
 .tomtom-waze--loading,
@@ -91,10 +92,119 @@
     border-top: 1px solid #334155;
 }
 
-.tomtom-waze__incidents ul {
-    margin: 0.25rem 0 0;
-    padding-left: 1rem;
+.tomtom-waze__incidents-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: #e2e8f0;
+    cursor: pointer;
+    text-align: left;
+}
+
+.tomtom-waze__incidents-toggle span {
+    color: #94a3b8;
+    font-size: 0.72rem;
+}
+
+.tomtom-waze__incident-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+}
+
+.tomtom-waze__incident-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid #475569;
+    background: rgba(30, 41, 59, 0.75);
+    font-size: 0.68rem;
+    color: #e2e8f0;
+}
+
+.tomtom-waze__incident-list {
+    list-style: none;
+    margin: 0.45rem 0 0;
+    padding: 0;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.tomtom-waze__incident-list li {
+    display: flex;
+    gap: 0.45rem;
+    align-items: flex-start;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.6);
     color: #fbbf24;
+}
+
+.tomtom-waze__incident-list li:last-child {
+    border-bottom: none;
+}
+
+.tomtom-waze__incident-list strong {
+    display: block;
+    color: #f8fafc;
+    font-size: 0.74rem;
+}
+
+.tomtom-waze__incident-list small {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.68rem;
+    line-height: 1.35;
+}
+
+.tomtom-waze__incident-emoji {
+    font-size: 1rem;
+    line-height: 1.2;
+}
+
+.tomtom-incident-marker {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    background: rgba(15, 20, 25, 0.92);
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+}
+
+.tomtom-incident-marker--accident {
+    border-color: #ef4444;
+}
+
+.tomtom-incident-marker--road_works {
+    border-color: #f59e0b;
+}
+
+.tomtom-incident-marker--police {
+    border-color: #3b82f6;
+}
+
+.tomtom-incident-marker--danger {
+    border-color: #f97316;
+}
+
+.tomtom-incident-marker--closed {
+    border-color: #dc2626;
+}
+
+.tomtom-incident-marker--radar {
+    border-color: #a855f7;
 }
 
 .tomtom-waze__legend {
@@ -102,13 +212,46 @@
     z-index: 5;
     bottom: 12px;
     left: 8px;
+    right: 8px;
     display: flex;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
     padding: 0.35rem 0.55rem;
     background: rgba(15, 20, 25, 0.88);
     border-radius: 8px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     color: #94a3b8;
+}
+
+.tomtom-waze__view-toggle {
+    display: inline-flex;
+    margin-right: auto;
+    padding: 2px;
+    border-radius: 8px;
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid #475569;
+}
+
+.tomtom-waze__view-toggle button {
+    min-width: 2.4rem;
+    padding: 0.28rem 0.55rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.tomtom-waze__view-toggle button.is-active {
+    background: #22d3ee;
+    color: #0f172a;
+}
+
+.tomtom-waze__view-toggle button:not(.is-active):hover {
+    color: #e2e8f0;
 }
 
 .tomtom-waze__legend span {
@@ -135,12 +278,12 @@
     background: #22c55e;
 }
 
-.tomtom-waze-marker--zombie {
+.tomtom-waze-marker--subject {
     background: #ef4444;
-    animation: zombiePulse 1.6s ease infinite;
+    animation: subjectPulse 1.6s ease infinite;
 }
 
-@keyframes zombiePulse {
+@keyframes subjectPulse {
     0%,
     100% {
         transform: scale(1);
@@ -179,6 +322,37 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 700;
+}
+
+.tracking-page__view-toggle {
+    display: inline-flex;
+    margin-left: auto;
+    padding: 2px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid #475569;
+}
+
+.tracking-page__view-toggle button {
+    min-width: 2.5rem;
+    padding: 0.3rem 0.65rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tracking-page__view-toggle button.is-active {
+    background: #22d3ee;
+    color: #0f172a;
+}
+
+.tracking-page__view-toggle button:not(.is-active):hover {
+    color: #e2e8f0;
 }
 
 .tracking-page__back {

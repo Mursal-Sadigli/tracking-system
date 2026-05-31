@@ -88,9 +88,19 @@ function checkGeofencesForPoint(lat, lon, geofences, previousInside = {}) {
         const inside = pointInPolygon(lat, lon, fence.polygon);
         const wasInside = previousInside[id] || false;
         if (inside && !wasInside) {
-            transitions.push({ geofence_id: id, type: 'geofence_enter', name: fence.name });
+            transitions.push({
+                geofence_id: id,
+                type: 'geofence_enter',
+                name: fence.name,
+                zone_type: fence.zone_type || 'restricted'
+            });
         } else if (!inside && wasInside) {
-            transitions.push({ geofence_id: id, type: 'geofence_exit', name: fence.name });
+            transitions.push({
+                geofence_id: id,
+                type: 'geofence_exit',
+                name: fence.name,
+                zone_type: fence.zone_type || 'restricted'
+            });
         }
         previousInside[id] = inside;
     }

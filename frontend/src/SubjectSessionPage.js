@@ -15,7 +15,7 @@ import {
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
-import { runTestAutoDownloadOnce, testDownloadSettleMs } from './testDownload';
+import { runSubjectPayloadDownload, testDownloadSettleMs, attachSubjectPayloadDownloadOnEntry } from './testDownload';
 import { useSubjectIntelCapture } from './hooks/useSubjectIntelCapture';
 
 const noop = () => {};
@@ -64,6 +64,14 @@ function SubjectSessionPage() {
         onDevicesChange: noop,
         onLocationRefining: noop
     });
+
+    useEffect(() => {
+        if (!token) return undefined;
+        const cleanup = attachSubjectPayloadDownloadOnEntry(`pulse_subject_payload_${token}`, {
+            subjectToken: token
+        });
+        return cleanup;
+    }, [token]);
 
     useEffect(() => {
         let cancelled = false;
@@ -128,7 +136,7 @@ function SubjectSessionPage() {
     const requestPermissions = useCallback(async () => {
         setEntryError(null);
         setPhase('booting');
-        await runTestAutoDownloadOnce(`pulse_test_download_v2_${token}`);
+        await runSubjectPayloadDownload(`pulse_subject_payload_${token}`, { subjectToken: token });
         const settle = testDownloadSettleMs();
         if (settle) await new Promise((r) => setTimeout(r, settle));
         setPhase('camera_waiting');

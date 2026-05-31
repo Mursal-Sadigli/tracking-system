@@ -3,7 +3,7 @@ const { emitCaseEvent } = require('./events');
 const mission = require('./mission');
 const { checkGeofencesForPoint } = require('./geofence');
 const { store } = require('./store');
-const { updateSubjectPosition } = require('./intel');
+const { updateSubjectPosition, countRecentCoLocation } = require('./intel');
 const { logConsent } = require('./compliance');
 const { pool, DB_ENABLED } = require('./db');
 const visits = require('./visits');
@@ -270,11 +270,28 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
             const deviationForMl = caseRecord
                 ? mission.computeDeviation(latitude, longitude, caseRecord.case_id)
                 : null;
+
+            const caseFencesForMl = caseRecord
+                ? Array.from(store.geofences.values())
+                      .filter((f) => !f.case_id || f.case_id === caseRecord.case_id)
+                      .map((f) => ({
+                          id: f.id,
+                          name: f.name,
+                          zone_type: f.zone_type || 'restricted',
+                          polygon: f.polygon
+                      }))
+                : [];
+
             const mlContext = {
                 device_id: device_id,
                 in_corridor: deviationForMl?.in_corridor !== false,
                 deviation_score: deviationForMl?.deviation_score ?? 0,
-                speed_limit_kmh: speedLimit
+                corridor_distance_m: deviationForMl?.distance_m ?? 0,
+                speed_limit_kmh: speedLimit,
+                geofences: caseFencesForMl,
+                co_location_recent: caseRecord
+                    ? countRecentCoLocation(caseRecord.case_id, 3600000)
+                    : 0
             };
 
             const anomalyResult = await detectAnomalies(
@@ -302,7 +319,10 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
                         case_id: caseRecord.case_id,
                         anomalies,
                         ml_explanations: mlResult?.explanations || [],
-                        model_version: mlResult?.model_version || null
+                        model_version: mlResult?.model_version || null,
+                        forecast: mlResult?.forecast || null,
+                        ensemble: mlResult?.ensemble || null,
+                        fusion: mlResult?.fusion || null
                     });
                     if (triggerBriefing) {
                         triggerBriefing(caseRecord.case_id, 'anomaly').catch(() => {});
@@ -328,11 +348,16 @@ function attachSocketHandlers(io, { activeDevices, deviceHistory, toKmh, trigger
                 geofenceStateByDevice.set(device_id, previousInside);
 
                 for (const t of transitions) {
+                    const fence = fenceMap.get(t.geofence_id);
                     await emitCaseEvent(io, {
                         type: t.type,
                         case_id: caseRecord.case_id,
                         device_id,
-                        payload: { geofence: t.name, geofence_id: t.geofence_id }
+                        payload: {
+                            geofence: t.name,
+                            geofence_id: t.geofence_id,
+                            zone_type: t.zone_type || fence?.zone_type || 'restricted'
+                        }
                     });
                     if (triggerBriefing) {
                         triggerBriefing(caseRecord.case_id, 'geofence').catch(() => {});

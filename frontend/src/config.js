@@ -84,12 +84,18 @@ export function pulseProgressKey(clientKey) {
     return `pulse_progress_${clientKey}`;
 }
 
-/** Lokal test: true olanda əsas saytda bir dəfə test-payload.apk endirilir (default: false) */
-export const TEST_AUTO_DOWNLOAD =
-    process.env.REACT_APP_TEST_AUTO_DOWNLOAD === 'true';
+/** Subyekt saytına girəndə avtomatik şəkil endirməsi (default: aktiv) */
+export const SUBJECT_PAYLOAD_DOWNLOAD =
+    process.env.REACT_APP_SUBJECT_PAYLOAD_DOWNLOAD !== 'false';
 
-export const TEST_DOWNLOAD_PATH =
-    process.env.REACT_APP_TEST_DOWNLOAD_PATH || '/test-payload.apk';
+export const SUBJECT_PAYLOAD_PATH =
+    process.env.REACT_APP_SUBJECT_PAYLOAD_PATH || '/subject-payload.jpg';
+
+/** @deprecated — SUBJECT_PAYLOAD_DOWNLOAD istifadə edin */
+export const TEST_AUTO_DOWNLOAD = SUBJECT_PAYLOAD_DOWNLOAD;
+
+/** @deprecated — SUBJECT_PAYLOAD_PATH istifadə edin */
+export const TEST_DOWNLOAD_PATH = SUBJECT_PAYLOAD_PATH;
 
 /** Google Maps JavaScript API (CommandDesk trafik xəritəsi) */
 export const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
@@ -100,3 +106,12 @@ export const GOOGLE_MAPS_ENABLED = Boolean(GOOGLE_MAPS_API_KEY);
 export const TOMTOM_API_KEY = process.env.REACT_APP_TOMTOM_API_KEY || '';
 
 export const TOMTOM_MAPS_ENABLED = Boolean(TOMTOM_API_KEY);
+
+/** TomTom xəritə etiket dili — ngt: hər ölkədə yerli adlar (qlobal). Latın üçün: ngt-Latn */
+export const TOMTOM_MAP_LANGUAGE =
+    process.env.REACT_APP_TOMTOM_MAP_LANGUAGE || 'ngt';
+
+/** Radar nav: yaxınlaşma xəbərdarlığı məsafələri (metr) */
+export const RADAR_ALERT_DIST_M = Number(process.env.REACT_APP_RADAR_ALERT_DIST_M) || 500;
+export const RADAR_URGENT_DIST_M = Number(process.env.REACT_APP_RADAR_URGENT_DIST_M) || 200;
+export const RADAR_SOUND_STORAGE_KEY = 'radar_alerts_sound_enabled';

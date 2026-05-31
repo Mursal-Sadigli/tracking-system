@@ -16,6 +16,7 @@ import MapLibre3D from './MapLibre3D';
 import GoogleTrafficMap from './maps/GoogleTrafficMap';
 import TomTomWaze from './components/TomTomWaze';
 import { GOOGLE_MAPS_ENABLED, TOMTOM_MAPS_ENABLED } from './config';
+import { zoneTypeMeta } from './utils/geofenceConstants';
 import './MapComponent.css';
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -69,6 +70,7 @@ function MapLayers({
     currentDeviceId,
     zonesToRender,
     routineZones,
+    geofences,
     cityRoads,
     cityVehicles,
     selectedDevice,
@@ -116,6 +118,31 @@ function MapLayers({
                     </Popup>
                 </Circle>
             ))}
+
+            {(geofences || []).map((g) => {
+                const meta = zoneTypeMeta(g.zone_type);
+                const positions = (g.polygon || []).map((p) => [p.lat, p.lon]);
+                if (positions.length < 3) return null;
+                return (
+                    <Polygon
+                        key={g.id}
+                        positions={positions}
+                        pathOptions={{
+                            color: meta.color,
+                            fillColor: meta.fillColor,
+                            fillOpacity: meta.fillOpacity,
+                            weight: 2,
+                            dashArray: g.zone_type === 'secret' ? '8 6' : undefined
+                        }}
+                    >
+                        <Popup>
+                            {meta.emoji} {g.name}
+                            <br />
+                            {meta.label}
+                        </Popup>
+                    </Polygon>
+                );
+            })}
 
             {userLocation?.accuracy != null && (
                 <Circle
@@ -252,6 +279,7 @@ function LeafletMapInstance({
     currentDeviceId,
     zonesToRender,
     routineZones,
+    geofences,
     cityRoads,
     cityVehicles,
     selectedDevice,
@@ -275,6 +303,7 @@ function LeafletMapInstance({
                 currentDeviceId={currentDeviceId}
                 zonesToRender={zonesToRender}
                 routineZones={routineZones}
+                geofences={geofences}
                 cityRoads={cityRoads}
                 cityVehicles={cityVehicles}
                 selectedDevice={selectedDevice}
@@ -292,7 +321,13 @@ function MapComponent({
     riskZones = [],
     routineZones = [],
     cityVehicles = [],
-    cityRoads = []
+    cityRoads = [],
+    routes,
+    selectedRouteIdx,
+    onSelectRoute,
+    loadingRoutes,
+    routeError,
+    geofences = []
 }) {
     const mapKey = useId();
     const [mapLayer, setMapLayer] = useState('street');
@@ -408,6 +443,12 @@ function MapComponent({
                     userLocation={userLocation}
                     centerLat={markerLat}
                     centerLon={markerLon}
+                    routes={routes}
+                    selectedRouteIdx={selectedRouteIdx}
+                    onSelectRoute={onSelectRoute}
+                    loadingRoutes={loadingRoutes}
+                    routeError={routeError}
+                    geofences={geofences}
                 />
             ) : mapMode === 'google' && GOOGLE_MAPS_ENABLED ? (
                 <GoogleTrafficMap
@@ -435,6 +476,7 @@ function MapComponent({
                 currentDeviceId={currentDeviceId}
                 zonesToRender={zonesToRender}
                 routineZones={routineZones}
+                geofences={geofences}
                 cityRoads={cityRoads}
                 cityVehicles={cityVehicles}
                 selectedDevice={selectedDevice}

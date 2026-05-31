@@ -73,6 +73,16 @@ function getCoLocationEvents(limit = 50) {
     return store.coLocationEvents.slice(-limit).reverse();
 }
 
+function countRecentCoLocation(caseId, windowMs = 3600000) {
+    if (!caseId) return 0;
+    const since = Date.now() - windowMs;
+    return store.coLocationEvents.filter((e) => {
+        const ts = new Date(e.ts).getTime();
+        if (Number.isNaN(ts) || ts < since) return false;
+        return e.case_a === caseId || e.case_b === caseId;
+    }).length;
+}
+
 function buildDwellZones(history, gridSize = 0.002) {
     const grid = new Map();
     for (const p of history) {
@@ -124,6 +134,7 @@ function getRoutineZones(caseId) {
 module.exports = {
     updateSubjectPosition,
     getCoLocationEvents,
+    countRecentCoLocation,
     buildDwellZones,
     buildHeatmapFromHistories,
     setCoLocationHandler,

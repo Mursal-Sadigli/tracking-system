@@ -11,13 +11,16 @@ function saveMlSnapshot(caseId, payload) {
         case_id: caseId,
         device_id: payload.device_id || null,
         updated_at: new Date().toISOString(),
-        model_version: payload.model_version || 'v1',
+        model_version: payload.model_version || 'v2',
         risk_score: payload.risk_score,
         risk_level: payload.risk_level,
         anomalies: payload.anomalies || [],
         explanations: payload.explanations || [],
         baseline: payload.baseline || null,
-        isolation_score: payload.isolation_score ?? null
+        isolation_score: payload.isolation_score ?? null,
+        forecast: payload.forecast || null,
+        ensemble: payload.ensemble || null,
+        fusion: payload.fusion || null
     };
     store.mlSnapshots[caseId] = record;
     persist();

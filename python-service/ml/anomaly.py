@@ -3,10 +3,9 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
-
 from ml.baseline import MIN_POINTS_DEFAULT, z_score
-from ml.features import _point_speed_kmh, haversine_meters
+from ml.features import _point_speed_kmh
+from ml.geo_utils import haversine_meters
 
 THRESHOLD = float(os.environ.get("ML_ANOMALY_THRESHOLD", "0.65"))
 Z_THRESHOLD = 3.0
@@ -83,13 +82,24 @@ def rule_anomalies(
             }
         )
 
+    if float(ctx.get("inside_forbidden") if "inside_forbidden" in ctx else 0) > 0:
+        anomalies.append(
+            {
+                "type": "inside_forbidden",
+                "severity": "critical",
+                "score": 1.0,
+                "explanation_az": "Subyekt qadağan zonada!",
+                "value": 1,
+            }
+        )
+
     return anomalies
 
 
 def ml_anomalies(
     current_features: Dict[str, float],
     baseline: Dict[str, Any],
-    if_score: Optional[float],
+    ensemble_score: Optional[float],
     min_points: int = MIN_POINTS_DEFAULT,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, float]]:
     z_scores = {}
@@ -113,35 +123,16 @@ def ml_anomalies(
             }
         )
 
-    if if_score is not None and if_score >= THRESHOLD:
+    score = ensemble_score
+    if score is not None and score >= THRESHOLD:
         anomalies.append(
             {
                 "type": "ml_isolation",
-                "severity": "high" if if_score >= 0.85 else "medium",
-                "score": if_score,
-                "explanation_az": f"Trajektoriya profili adətənkindən fərqlidir (skor: {if_score:.2f})",
-                "value": if_score,
+                "severity": "high" if score >= 0.85 else "medium",
+                "score": score,
+                "explanation_az": f"Trajektoriya profili adətənkindən fərqlidir (skor: {score:.2f})",
+                "value": score,
             }
         )
 
     return anomalies, z_scores
-
-
-def compute_isolation_score(
-    feature_matrix: List[List[float]],
-    current_vector: List[float],
-) -> Optional[float]:
-    if len(feature_matrix) < 30:
-        return None
-    try:
-        from sklearn.ensemble import IsolationForest
-
-        X = np.array(feature_matrix[-200:], dtype=float)
-        clf = IsolationForest(contamination=0.08, random_state=42, n_estimators=64)
-        clf.fit(X)
-        cur = np.array([current_vector], dtype=float)
-        raw = -clf.decision_function(cur)[0]
-        normalized = 1.0 / (1.0 + np.exp(-raw))
-        return float(normalized)
-    except Exception:
-        return None

@@ -4,6 +4,8 @@ import { getTrackingSocket } from '../socketService';
 import { apiGet } from '../api';
 import { GPS_OPTIONS, saveLastKnownLocation } from '../geolocation';
 import { ADMIN_PATH } from '../config';
+import alertManager, { ALERT_TYPES } from '../AlertManager';
+import { geofenceAlertSeverity, geofenceEventMessage } from '../utils/geofenceConstants';
 import '../components/TomTomWaze.css';
 
 function TrackingPage() {
@@ -11,6 +13,8 @@ function TrackingPage() {
     const [selectedCase, setSelectedCase] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
     const [gpsError, setGpsError] = useState('');
+    const [geofences, setGeofences] = useState([]);
+    const [geofenceAlert, setGeofenceAlert] = useState('');
 
     const loadCases = useCallback(async () => {
         try {
@@ -54,7 +58,21 @@ function TrackingPage() {
         };
 
         socket.on('location_update', onLocation);
-        return () => socket.off('location_update', onLocation);
+
+        const onCaseEvent = (ev) => {
+            if (ev.type !== 'geofence_enter' && ev.type !== 'geofence_exit') return;
+            const zoneType = ev.payload?.zone_type || 'restricted';
+            const severity = geofenceAlertSeverity(zoneType, ev.type);
+            const message = geofenceEventMessage(ev);
+            setGeofenceAlert(message);
+            alertManager.addAlert(ALERT_TYPES.GEOFENCE_ALERT, message, severity);
+        };
+        socket.on('case_event', onCaseEvent);
+
+        return () => {
+            socket.off('location_update', onLocation);
+            socket.off('case_event', onCaseEvent);
+        };
     }, []);
 
     useEffect(() => {
@@ -65,8 +83,27 @@ function TrackingPage() {
 
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
-                const { latitude, longitude, accuracy } = pos.coords;
-                setUserLocation({ lat: latitude, lon: longitude, accuracy });
+                const { latitude, longitude, accuracy, speed } = pos.coords;
+                const speedKmh =
+                    speed != null && Number.isFinite(speed) && speed >= 0
+                        ? Math.round(speed * 3.6)
+                        : null;
+                setUserLocation((prev) => {
+                    const latR = Math.round(latitude * 1e5) / 1e5;
+                    const lonR = Math.round(longitude * 1e5) / 1e5;
+                    const prevLatR = prev ? Math.round(prev.lat * 1e5) / 1e5 : null;
+                    const prevLonR = prev ? Math.round(prev.lon * 1e5) / 1e5 : null;
+                    if (
+                        prev &&
+                        prevLatR === latR &&
+                        prevLonR === lonR &&
+                        prev.speedKmh === speedKmh &&
+                        prev.accuracy === accuracy
+                    ) {
+                        return prev;
+                    }
+                    return { lat: latitude, lon: longitude, accuracy, speedKmh };
+                });
                 if (accuracy != null && accuracy <= 500) {
                     saveLastKnownLocation(latitude, longitude, accuracy);
                 }
@@ -86,6 +123,17 @@ function TrackingPage() {
 
     const selectedDevice = caseDevices[0] || null;
 
+    useEffect(() => {
+        const caseId = selectedCase?.case_id || selectedDevice?.case_id;
+        if (!caseId) {
+            setGeofences([]);
+            return;
+        }
+        apiGet(`/api/geofences?case_id=${encodeURIComponent(caseId)}`, { admin: true })
+            .then((data) => setGeofences(data.geofences || []))
+            .catch(() => setGeofences([]));
+    }, [selectedCase?.case_id, selectedDevice?.case_id]);
+
     const centerLat = selectedDevice?.lat ?? userLocation?.lat;
     const centerLon = selectedDevice?.lon ?? userLocation?.lon;
 
@@ -99,21 +147,21 @@ function TrackingPage() {
                 </a>
                 <h1>Waze naviqasiya</h1>
                 {gpsError && <span className="tracking-page__warn">{gpsError}</span>}
+                {geofenceAlert && (
+                    <span className="tracking-page__warn tracking-page__geofence">{geofenceAlert}</span>
+                )}
             </header>
             <div className="tracking-page__map">
-                {centerLat != null && centerLon != null ? (
-                    <TomTomWaze
-                        devices={caseDevices.length ? caseDevices : devices}
-                        selectedDevice={selectedDevice}
-                        userLocation={userLocation}
-                        centerLat={centerLat}
-                        centerLon={centerLon}
-                    />
-                ) : (
-                    <div className="tomtom-waze tomtom-waze--loading">
-                        Subyekt konumu gözlənilir...
-                    </div>
-                )}
+                <TomTomWaze
+                    devices={caseDevices.length ? caseDevices : devices}
+                    selectedDevice={selectedDevice}
+                    userLocation={userLocation}
+                    centerLat={centerLat}
+                    centerLon={centerLon}
+                    operatorSpeedKmh={userLocation?.speedKmh}
+                    navigationMode
+                    geofences={geofences}
+                />
             </div>
         </div>
     );

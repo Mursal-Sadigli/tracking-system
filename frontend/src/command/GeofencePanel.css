@@ -1,0 +1,203 @@
+.geofence-panel {
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid #334155;
+    border-radius: 10px;
+}
+
+.geofence-panel h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.95rem;
+}
+
+.geofence-panel__hint {
+    margin: 0 0 0.6rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.geofence-panel__legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.65rem;
+    font-size: 0.72rem;
+}
+
+.geofence-panel__legend-item--forbidden {
+    color: #fca5a5;
+}
+
+.geofence-panel__legend-item--restricted {
+    color: #fdba74;
+}
+
+.geofence-panel__legend-item--secret {
+    color: #d8b4fe;
+}
+
+.geofence-panel__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.geofence-panel__field input,
+.geofence-panel__field select {
+    padding: 0.35rem 0.45rem;
+    border-radius: 6px;
+    border: 1px solid #475569;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+.geofence-panel__draw-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+}
+
+.geofence-panel__draw-actions button {
+    padding: 0.35rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid #475569;
+    background: #334155;
+    color: #e2e8f0;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.geofence-panel__draw-actions button.is-active {
+    border-color: #22d3ee;
+    background: rgba(34, 211, 238, 0.15);
+}
+
+.geofence-panel__draw-actions button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.geofence-panel__clear {
+    color: #fca5a5 !important;
+}
+
+.geofence-panel__mini-map {
+    height: 160px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #334155;
+    margin-bottom: 0.5rem;
+}
+
+.geofence-panel__mini-map .leaflet-container {
+    height: 100%;
+    width: 100%;
+}
+
+.geofence-panel__error {
+    color: #fca5a5;
+    font-size: 0.75rem;
+    margin: 0.25rem 0;
+}
+
+.geofence-panel__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.geofence-panel__empty {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.geofence-panel__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0;
+    border-top: 1px solid #334155;
+    font-size: 0.78rem;
+}
+
+.geofence-panel__item strong {
+    display: block;
+}
+
+.geofence-panel__item span {
+    color: #94a3b8;
+    font-size: 0.7rem;
+}
+
+.geofence-panel__item button {
+    padding: 0.2rem 0.45rem;
+    border: none;
+    border-radius: 4px;
+    background: #7f1d1d;
+    color: #fecaca;
+    cursor: pointer;
+    font-size: 0.68rem;
+}
+
+.command-desk__geofence-alert {
+    margin: 0.5rem 0;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid;
+    font-size: 0.82rem;
+}
+
+.command-desk__geofence-alert--critical {
+    background: rgba(127, 29, 29, 0.35);
+    border-color: #ef4444;
+    color: #fecaca;
+}
+
+.command-desk__geofence-alert--warning {
+    background: rgba(124, 45, 18, 0.35);
+    border-color: #f97316;
+    color: #fed7aa;
+}
+
+.command-desk__geofence-alert--info {
+    background: rgba(30, 58, 138, 0.35);
+    border-color: #3b82f6;
+    color: #bfdbfe;
+}
+
+.command-desk__geofence-alert button {
+    margin-top: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    cursor: pointer;
+}
+
+.command-desk__alert-stack {
+    position: absolute;
+    z-index: 20;
+    top: 52px;
+    right: 8px;
+    width: min(360px, calc(100% - 16px));
+}
+
+.case-timeline__item--geofence_enter,
+.case-timeline__item--geofence_exit {
+    border-left: 3px solid #f97316;
+}
+
+.case-timeline__item--geofence_enter.case-timeline__item--forbidden {
+    border-left-color: #ef4444;
+}
+
+.case-timeline__item--geofence_enter.case-timeline__item--secret {
+    border-left-color: #a855f7;
+}

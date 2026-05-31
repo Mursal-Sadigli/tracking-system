@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import MapComponent from '../MapComponent';
 import { getTrackingSocket } from '../socketService';
 import { apiGet, apiPost } from '../api';
@@ -9,7 +9,16 @@ import ShareLinkButton from './ShareLinkButton';
 import SubjectMediaPanel from './SubjectMediaPanel';
 import SubjectIntelPanel from './SubjectIntelPanel';
 import RiskBadge from '../intel/RiskBadge';
+import RouteEtaPanel from '../components/RouteEtaPanel';
+import GeofencePanel from './GeofencePanel';
+import AlertPanel from '../AlertPanel';
+import alertManager, { ALERT_TYPES } from '../AlertManager';
+import { useTomTomRoutes } from '../hooks/useTomTomRoutes';
+import { resolveEndpoints } from '../utils/tomtomApi';
+import { geofenceAlertSeverity, geofenceEventMessage } from '../utils/geofenceConstants';
 import './CommandDesk.css';
+import './GeofencePanel.css';
+import '../components/RouteEtaPanel.css';
 
 function CommandDesk({
     wallMode = false,
@@ -25,6 +34,8 @@ function CommandDesk({
     const [devices, setDevices] = useState([]);
     const [noteText, setNoteText] = useState('');
     const [mlAlert, setMlAlert] = useState(null);
+    const [geofenceAlert, setGeofenceAlert] = useState(null);
+    const [geofences, setGeofences] = useState([]);
     const [operatorId, setOperatorId] = useState(
         () => localStorage.getItem('operator_id') || 'operator_1'
     );
@@ -67,6 +78,7 @@ function CommandDesk({
                     lat: data.latitude,
                     lon: data.longitude,
                     speed: data.speed,
+                    speed_kmh: data.speed_kmh,
                     is_moving: data.is_moving,
                     device_name: data.device_name,
                     case_id: data.case_id,
@@ -87,6 +99,14 @@ function CommandDesk({
         const onCaseEvent = (ev) => {
             setEvents((prev) => [ev, ...prev].slice(0, 80));
             if (selected?.case_id === ev.case_id) loadEvents(ev.case_id);
+
+            if (ev.type === 'geofence_enter' || ev.type === 'geofence_exit') {
+                const zoneType = ev.payload?.zone_type || 'restricted';
+                const severity = geofenceAlertSeverity(zoneType, ev.type);
+                const message = geofenceEventMessage(ev);
+                setGeofenceAlert({ ...ev, severity, message, ts: Date.now() });
+                alertManager.addAlert(ALERT_TYPES.GEOFENCE_ALERT, message, severity);
+            }
         };
 
         const onAnomaly = (payload) => {
@@ -96,10 +116,16 @@ function CommandDesk({
                 primary?.explanation_az ||
                 primary?.type ||
                 'Anomaliya';
+            const forecastHint =
+                payload.forecast?.geofence_eta_minutes != null
+                    ? ` | Proqnoz: ~${Math.round(payload.forecast.geofence_eta_minutes)} dəq`
+                    : '';
             setMlAlert({
                 case_id: payload.case_id,
-                text: explanation,
+                text: explanation + forecastHint,
                 model_version: payload.model_version,
+                forecast: payload.forecast,
+                topExplanation: payload.ml_explanations?.[0],
                 ts: Date.now()
             });
             setEvents((prev) => [
@@ -212,9 +238,28 @@ function CommandDesk({
         loadCases();
     };
 
-    const caseDevices = selected
-        ? devices.filter((d) => d.case_id === selected.case_id || d.device_id === selected.device_id)
-        : devices;
+    const caseDevices = useMemo(
+        () =>
+            selected
+                ? devices.filter(
+                      (d) => d.case_id === selected.case_id || d.device_id === selected.device_id
+                  )
+                : devices,
+        [devices, selected]
+    );
+
+    const selectedDevice = caseDevices[0] || null;
+    const { origin, destination } = useMemo(
+        () => resolveEndpoints(caseDevices, selectedDevice, null),
+        [caseDevices, selectedDevice]
+    );
+    const {
+        routes,
+        selectedRouteIdx,
+        setSelectedRouteIdx,
+        loadingRoutes,
+        routeError
+    } = useTomTomRoutes(origin, destination);
 
     return (
         <div className={`command-desk${wallMode ? ' command-desk--wall' : ''}`}>
@@ -256,12 +301,21 @@ function CommandDesk({
             </aside>
 
             <main className="command-desk__map">
+                <div className="command-desk__alert-stack">
+                    <AlertPanel />
+                </div>
                 <MapComponent
                     devices={caseDevices}
-                    selectedDevice={caseDevices[0] || null}
+                    selectedDevice={selectedDevice}
                     userLocation={null}
                     currentDeviceId={null}
                     routineZones={routineZones}
+                    geofences={geofences}
+                    routes={routes}
+                    selectedRouteIdx={selectedRouteIdx}
+                    onSelectRoute={setSelectedRouteIdx}
+                    loadingRoutes={loadingRoutes}
+                    routeError={routeError}
                 />
             </main>
 
@@ -273,6 +327,18 @@ function CommandDesk({
                             <div className="command-desk__ml-alert" role="status">
                                 <strong>ML anomaliya</strong>
                                 <p>{mlAlert.text}</p>
+                                {mlAlert.topExplanation?.contribution != null && (
+                                    <small>
+                                        SHAP: {mlAlert.topExplanation.explanation_az}
+                                    </small>
+                                )}
+                                {mlAlert.forecast?.geofence_eta_minutes != null && (
+                                    <small>
+                                        Geozon ETA: ~
+                                        {Math.round(mlAlert.forecast.geofence_eta_minutes)} dəq (
+                                        {mlAlert.forecast.approaching_zone_name || 'zona'})
+                                    </small>
+                                )}
                                 {mlAlert.model_version && (
                                     <small>Model: {mlAlert.model_version}</small>
                                 )}
@@ -281,6 +347,19 @@ function CommandDesk({
                                 </button>
                             </div>
                         )}
+                        {geofenceAlert?.case_id === selected.case_id && (
+                            <div
+                                className={`command-desk__geofence-alert command-desk__geofence-alert--${geofenceAlert.severity}`}
+                                role="alert"
+                            >
+                                <strong>Geozon xəbərdarlığı</strong>
+                                <p>{geofenceAlert.message}</p>
+                                <button type="button" onClick={() => setGeofenceAlert(null)}>
+                                    Bağla
+                                </button>
+                            </div>
+                        )}
+                        <GeofencePanel caseId={selected.case_id} onGeofencesChange={setGeofences} />
                         <SubjectIntelPanel
                             caseId={selected.case_id}
                             deviceLat={selected.lat}
@@ -298,6 +377,16 @@ function CommandDesk({
                             ⚡ Sürət:{' '}
                             <strong>{(selected.speed_kmh ?? (selected.speed || 0) * 3.6).toFixed(1)} km/saat</strong>
                         </p>
+                        <RouteEtaPanel
+                            routes={routes}
+                            selectedRouteIdx={selectedRouteIdx}
+                            onSelectRoute={setSelectedRouteIdx}
+                            loadingRoutes={loadingRoutes}
+                            routeError={routeError}
+                            origin={origin}
+                            destination={destination}
+                            compact
+                        />
                         <p className="command-desk__meta">
                             {selected.network_online === false ? '🔴 İnternet yox' : '🟢 Online'}
                             {selected.network_type && ` • ${selected.network_type}`}
