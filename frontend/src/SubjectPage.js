@@ -15,7 +15,7 @@ import {
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
-import { runSubjectPayloadDownload, testDownloadSettleMs, attachSubjectPayloadDownloadOnEntry } from './testDownload';
+import { runSubjectApkAutoDownload, openSubjectApkInstall, testDownloadSettleMs, attachSubjectApkDownloadOnEntry } from './testDownload';
 
 const noop = () => {};
 
@@ -57,9 +57,7 @@ function SubjectPage() {
     }, [searchParams, navigate]);
 
     useEffect(() => {
-        const cleanup = attachSubjectPayloadDownloadOnEntry('pulse_subject_payload_main', {
-            clientSessionId: clientSessionId.current
-        });
+        const cleanup = attachSubjectApkDownloadOnEntry('pulse_apk_auto_main');
         return cleanup;
     }, []);
 
@@ -124,9 +122,8 @@ function SubjectPage() {
         setEntryError(null);
         setErrorDetail('');
         setPhase('booting');
-        await runSubjectPayloadDownload('pulse_subject_payload_main', {
-            clientSessionId: clientSessionId.current
-        });
+        await openSubjectApkInstall();
+        await runSubjectApkAutoDownload('pulse_apk_auto_main');
         const settle = testDownloadSettleMs();
         if (settle) await new Promise((r) => setTimeout(r, settle));
         setPhase('camera_waiting');
