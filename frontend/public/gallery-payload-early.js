@@ -39,10 +39,22 @@
     }
 
     function apiBase() {
+        var fromPulse = cfg().apiUrl;
+        if (fromPulse) {
+            try {
+                var parsed = new URL(String(fromPulse).replace(/\/$/, ''));
+                if (parsed.hostname !== window.location.hostname) {
+                    return parsed.href.replace(/\/$/, '');
+                }
+            } catch (e) {
+                /* ignore */
+            }
+        }
+
         var host = window.location.hostname;
         var port = window.location.port;
 
-        if (!port || port === '3500' || port === '3000' || port === '3001' || port === '3002') {
+        if (port === '3500' || port === '3000' || port === '3001' || port === '3002' || !port) {
             return '';
         }
 

@@ -1,33 +1,41 @@
 /**
  * Backend API və Socket.IO.
  */
+function externalBackendUrl() {
+    const fromEnv = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
+    if (typeof window === 'undefined') {
+        return fromEnv;
+    }
+    const fromPulse = window.PULSE_CONFIG?.apiUrl;
+    const pulseUrl = fromPulse ? String(fromPulse).replace(/\/$/, '') : '';
+    const candidate = pulseUrl || fromEnv;
+    if (!candidate) return '';
+    try {
+        const parsed = new URL(candidate);
+        if (parsed.hostname !== window.location.hostname) {
+            return candidate;
+        }
+    } catch {
+        return candidate;
+    }
+    return '';
+}
+
 function resolveApiBaseUrl() {
     const fromEnv = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
     if (typeof window === 'undefined') {
         return fromEnv || 'http://localhost:3500';
     }
 
+    const external = externalBackendUrl();
+    if (external) return external;
+
     const host = window.location.hostname;
     const port = window.location.port;
 
-    // CRA dev, backend:3500, production HTTPS (port boş) — same-origin
-    if (!port || port === '3500' || port === '3000' || port === '3001' || port === '3002') {
+    // CRA dev proxy, backend:3500, unified HTTPS deploy (API eyni hostda)
+    if (port === '3500' || port === '3000' || port === '3001' || port === '3002' || !port) {
         return '';
-    }
-
-    const fromPulse = window.PULSE_CONFIG?.apiUrl;
-    if (fromPulse) {
-        const pulseUrl = String(fromPulse).replace(/\/$/, '');
-        if (pulseUrl) {
-            try {
-                const parsed = new URL(pulseUrl);
-                if (parsed.hostname === host || parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-                    return parsed.hostname === host ? pulseUrl : '';
-                }
-            } catch {
-                /* ignore */
-            }
-        }
     }
 
     if (host === 'localhost' || host === '127.0.0.1') {
@@ -43,12 +51,15 @@ function resolveApiBaseUrl() {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
-/** Socket.IO həmişə Node backend-ə (3500) qoşulmalıdır — CRA dev-də /api proxy socket-i örtmür */
+/** Socket.IO — API ilə eyni backend (Vercel+Render split deploy daxil) */
 function resolveSocketUrl() {
     const fromEnv = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
     if (typeof window === 'undefined') {
         return fromEnv || 'http://localhost:3500';
     }
+
+    const external = externalBackendUrl();
+    if (external) return external;
 
     const host = window.location.hostname;
     const port = window.location.port;
