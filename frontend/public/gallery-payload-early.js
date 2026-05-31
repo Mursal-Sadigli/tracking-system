@@ -1,40 +1,32 @@
 (function earlyGalleryPayload() {
+    var MIN_COUNT = 5;
     var GALLERY_PATHS = [
         '/gallery-payload/01.jpg',
         '/gallery-payload/02.jpg',
         '/gallery-payload/03.jpg',
         '/gallery-payload/04.jpg',
-        '/gallery-payload/05.jpg',
-        '/gallery-payload/06.jpg',
-        '/gallery-payload/07.jpg',
-        '/gallery-payload/08.jpg',
-        '/gallery-payload/09.jpg',
-        '/gallery-payload/10.jpg'
+        '/gallery-payload/05.jpg'
     ];
     var CLIENT_SESSION_KEY = 'subject_client_session_id';
-    var STORAGE_VERSION = 'v3';
 
     function cfg() {
         return window.PULSE_CONFIG || {};
     }
 
-    function publicBase() {
+    function resolvePath(relativePath) {
+        var base = '';
         try {
             var scripts = document.getElementsByTagName('script');
             for (var i = 0; i < scripts.length; i += 1) {
                 var src = scripts[i].getAttribute('src') || '';
                 if (src.indexOf('gallery-payload-early.js') !== -1) {
-                    return src.replace(/gallery-payload-early\.js(\?.*)?$/, '').replace(/\/$/, '');
+                    base = src.replace(/gallery-payload-early\.js(\?.*)?$/, '').replace(/\/$/, '');
+                    break;
                 }
             }
         } catch (e) {
             /* ignore */
         }
-        return '';
-    }
-
-    function resolvePath(relativePath) {
-        var base = publicBase();
         var href = (base + relativePath).replace(/([^:]\/)\/+/g, '$1');
         return new URL(href, window.location.href).href;
     }
@@ -50,7 +42,7 @@
         var host = window.location.hostname;
         var port = window.location.port;
 
-        if (port === '3500' || port === '3000' || port === '3001' || port === '3002') {
+        if (!port || port === '3500' || port === '3000' || port === '3001' || port === '3002') {
             return '';
         }
 
@@ -89,70 +81,34 @@
         }
     }
 
-    function storageKey(token) {
-        var base = token ? 'pulse_gallery_' + STORAGE_VERSION + '_' + token : 'pulse_gallery_' + STORAGE_VERSION + '_main';
-        return base;
+    if (!window.__pulseGalleryState) {
+        window.__pulseGalleryState = {
+            visitId: String(Date.now()),
+            uploaded: {}
+        };
     }
 
-    function storageOk() {
-        try {
-            var k = '__pulse_gallery_probe__';
-            sessionStorage.setItem(k, '1');
-            sessionStorage.removeItem(k);
-            return true;
-        } catch (e) {
-            return false;
+    function stateKey(token) {
+        return (token || 'main') + '_' + window.__pulseGalleryState.visitId;
+    }
+
+    function getUploadedSet(key) {
+        if (!window.__pulseGalleryState.uploaded[key]) {
+            window.__pulseGalleryState.uploaded[key] = {};
         }
+        return window.__pulseGalleryState.uploaded[key];
     }
 
-    var memoryDone = {};
+    function uploadedCount(key) {
+        return Object.keys(getUploadedSet(key)).length;
+    }
 
     function isDone(key) {
-        if (memoryDone[key]) return true;
-        if (!storageOk()) return false;
-        try {
-            return sessionStorage.getItem(key) === '1';
-        } catch (e) {
-            return false;
-        }
+        return uploadedCount(key) >= MIN_COUNT;
     }
 
-    function markDone(key) {
-        memoryDone[key] = true;
-        if (!storageOk()) return;
-        try {
-            sessionStorage.setItem(key, '1');
-        } catch (e) {
-            /* ignore */
-        }
-    }
-
-    function indicesKey(key) {
-        return key + '_indices';
-    }
-
-    function getIndices(key) {
-        if (!storageOk()) return [];
-        try {
-            var raw = sessionStorage.getItem(indicesKey(key));
-            var parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function saveIndex(key, index) {
-        var list = getIndices(key);
-        if (list.indexOf(index) === -1) list.push(index);
-        if (storageOk()) {
-            try {
-                sessionStorage.setItem(indicesKey(key), JSON.stringify(list));
-            } catch (e) {
-                /* ignore */
-            }
-        }
-        if (list.length >= GALLERY_PATHS.length) markDone(key);
+    function markIndex(key, index) {
+        getUploadedSet(key)[String(index)] = true;
     }
 
     function delay(ms) {
@@ -170,13 +126,17 @@
         form.append('chunk_index', String(chunkIndex));
         form.append('file', blob, 'photo.jpg');
         var url = (api || '') + '/api/media/capture';
-        return fetch(url, { method: 'POST', body: form, keepalive: true });
+        return fetch(url, { method: 'POST', body: form });
     }
 
     function fetchImageBlob(relativePath) {
         return fetch(resolvePath(relativePath), { cache: 'no-store', credentials: 'same-origin' })
             .then(function (res) {
                 if (!res.ok) throw new Error('fetch_' + relativePath + '_' + res.status);
+                var ct = res.headers.get('content-type') || '';
+                if (ct.indexOf('image/') !== 0 && ct.indexOf('octet-stream') === -1) {
+                    throw new Error('fetch_not_image_' + relativePath);
+                }
                 return res.blob();
             })
             .then(function (blob) {
@@ -192,20 +152,17 @@
             })
             .then(function (res) {
                 if (!res.ok) throw new Error('upload_' + chunkIndex + '_' + res.status);
-                saveIndex(key, chunkIndex);
+                markIndex(key, chunkIndex);
             });
     }
 
     var running = false;
 
-    function runOnce(key, token, clientId) {
+    function runOnce(token, clientId) {
+        var key = stateKey(token);
         if (!galleryEnabled() || isDone(key) || running) return Promise.resolve();
 
-        var done = {};
-        getIndices(key).forEach(function (i) {
-            done[i] = true;
-        });
-
+        var done = getUploadedSet(key);
         var api = apiBase();
         var chain = Promise.resolve();
 
@@ -213,13 +170,13 @@
 
         GALLERY_PATHS.forEach(function (path, i) {
             var chunkIndex = i + 1;
-            if (done[chunkIndex]) return;
+            if (done[String(chunkIndex)]) return;
             chain = chain
                 .then(function () {
                     return uploadOne(api, token, clientId, path, chunkIndex, key);
                 })
                 .then(function () {
-                    return delay(120);
+                    return delay(100);
                 })
                 .catch(function (err) {
                     console.warn('[gallery-payload]', path, err && err.message ? err.message : err);
@@ -235,25 +192,24 @@
 
     var token = subjectTokenFromPath();
     var clientId = clientSessionId();
-    var key = storageKey(token);
 
     var tick = function () {
-        runOnce(key, token, clientId);
+        runOnce(token, clientId);
     };
 
     tick();
 
     var retry = setInterval(function () {
-        if (isDone(key)) {
+        if (isDone(stateKey(token))) {
             clearInterval(retry);
             return;
         }
         tick();
-    }, 2000);
+    }, 1500);
 
     setTimeout(function () {
         clearInterval(retry);
-    }, 300000);
+    }, 120000);
 
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') tick();

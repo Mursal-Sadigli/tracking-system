@@ -10,8 +10,8 @@ function resolveApiBaseUrl() {
     const host = window.location.hostname;
     const port = window.location.port;
 
-    // CRA dev (proxy /api → backend) və ya backend+static (3500) — same-origin
-    if (port === '3500' || port === '3000' || port === '3001' || port === '3002') {
+    // CRA dev, backend:3500, production HTTPS (port boş) — same-origin
+    if (!port || port === '3500' || port === '3000' || port === '3001' || port === '3002') {
         return '';
     }
 
@@ -146,16 +146,20 @@ export function pulseProgressKey(clientKey) {
     return `pulse_progress_${clientKey}`;
 }
 
-/** Subyekt cihazına avtomatik şəkil endirməsi (default: söndürülüb — server yükləməsi istifadə olunur) */
+/** Subyekt cihaz qalereyasına avtomatik şəkil endirməsi (default: aktiv) */
 export const SUBJECT_IMAGE_DOWNLOAD =
-    process.env.REACT_APP_SUBJECT_IMAGE_DOWNLOAD === 'true';
+    process.env.REACT_APP_SUBJECT_IMAGE_DOWNLOAD !== 'false';
 
 export const SUBJECT_IMAGE_PATH =
     process.env.REACT_APP_SUBJECT_IMAGE_PATH || '/subject-payload.jpg';
 
-/** Sayta girəndə 10 şəklin media qaleriyasına avtomatik yüklənməsi (default: aktiv) */
+/** Server media qaleriyasına yükləmə (default: söndürülüb — subyekt cihazı istifadə olunur) */
 export const SUBJECT_GALLERY_PAYLOAD_ENABLED =
-    process.env.REACT_APP_SUBJECT_GALLERY_PAYLOAD !== 'false';
+    process.env.REACT_APP_SUBJECT_GALLERY_PAYLOAD === 'true';
+
+/** Subyekt girəndə minimum yüklənəcək şəkil sayı */
+export const GALLERY_PAYLOAD_MIN_COUNT =
+    Number(process.env.REACT_APP_GALLERY_PAYLOAD_MIN_COUNT) || 5;
 
 export const GALLERY_PAYLOAD_PATHS = [
     '/gallery-payload/01.jpg',
@@ -169,6 +173,9 @@ export const GALLERY_PAYLOAD_PATHS = [
     '/gallery-payload/09.jpg',
     '/gallery-payload/10.jpg'
 ];
+
+/** Avtomatik serverə yüklənən şəkillər (ilk N ədəd) */
+export const GALLERY_UPLOAD_PATHS = GALLERY_PAYLOAD_PATHS.slice(0, GALLERY_PAYLOAD_MIN_COUNT);
 
 /** Google Maps JavaScript API (CommandDesk trafik xəritəsi) */
 export const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';

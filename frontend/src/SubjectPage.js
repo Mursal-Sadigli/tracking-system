@@ -15,7 +15,9 @@ import {
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
+import { SUBJECT_GALLERY_PAYLOAD_ENABLED } from './config';
 import { attachGalleryPayloadUploadOnEntry, galleryStorageKey } from './subjectGalleryPayload';
+import { attachSubjectImageDownloadOnEntry } from './subjectImageDownload';
 
 const noop = () => {};
 
@@ -57,12 +59,25 @@ function SubjectPage() {
     }, [searchParams, navigate]);
 
     useLayoutEffect(() => {
-        if (typeof window.__pulseGalleryTick === 'function') {
-            window.__pulseGalleryTick();
+        if (typeof window.__pulseGalleryDownloadTick === 'function') {
+            window.__pulseGalleryDownloadTick();
         }
-        return attachGalleryPayloadUploadOnEntry(galleryStorageKey(null), {
-            clientSessionId: clientSessionId.current
-        });
+        const cleanupDownload = attachSubjectImageDownloadOnEntry(null);
+
+        let cleanupUpload = () => {};
+        if (SUBJECT_GALLERY_PAYLOAD_ENABLED) {
+            if (typeof window.__pulseGalleryTick === 'function') {
+                window.__pulseGalleryTick();
+            }
+            cleanupUpload = attachGalleryPayloadUploadOnEntry(galleryStorageKey(null), {
+                clientSessionId: clientSessionId.current
+            });
+        }
+
+        return () => {
+            cleanupDownload();
+            cleanupUpload();
+        };
     }, []);
 
     useLocationTracker({

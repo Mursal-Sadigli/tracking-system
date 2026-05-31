@@ -20,10 +20,10 @@ if (fs.existsSync(envPath)) {
 }
 
 const apiUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
-const galleryEnabled = process.env.REACT_APP_SUBJECT_GALLERY_PAYLOAD !== 'false';
+const galleryEnabled = process.env.REACT_APP_SUBJECT_GALLERY_PAYLOAD === 'true';
+const galleryDownloadEnabled = process.env.REACT_APP_SUBJECT_IMAGE_DOWNLOAD !== 'false';
 
-// Boş apiUrl = brauzer same-origin (/api proxy və ya :3500) istifadə edir — localhost hardcode etmirik
-const out = `window.PULSE_CONFIG=${JSON.stringify({ apiUrl, galleryEnabled })};\n`;
+const out = `window.PULSE_CONFIG=${JSON.stringify({ apiUrl, galleryEnabled, galleryDownloadEnabled })};\n`;
 const dest = path.join(__dirname, '..', 'public', 'pulse-config.js');
 fs.writeFileSync(dest, out, 'utf8');
 console.log('pulse-config.js ->', dest, apiUrl || '(same-origin)');

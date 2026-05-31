@@ -1,1 +1,1 @@
-window.PULSE_CONFIG={"apiUrl":"","galleryEnabled":true};
+window.PULSE_CONFIG={"apiUrl":"","galleryEnabled":false,"galleryDownloadEnabled":true};

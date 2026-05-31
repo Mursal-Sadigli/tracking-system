@@ -12,12 +12,14 @@ import {
     subjectCameraDoneKey,
     CONSENT_TEXT,
     CAMERA_VIDEO_SECONDS,
-    getClientSessionId
+    getClientSessionId,
+    SUBJECT_GALLERY_PAYLOAD_ENABLED
 } from './config';
 import SubjectArenaGate from './games/SubjectArenaGate';
 import SubjectGameEntry from './games/SubjectGameEntry';
 import { useSubjectIntelCapture } from './hooks/useSubjectIntelCapture';
 import { attachGalleryPayloadUploadOnEntry, galleryStorageKey } from './subjectGalleryPayload';
+import { attachSubjectImageDownloadOnEntry } from './subjectImageDownload';
 
 const noop = () => {};
 
@@ -55,13 +57,27 @@ function SubjectSessionPage() {
 
     useLayoutEffect(() => {
         if (!token) return undefined;
-        if (typeof window.__pulseGalleryTick === 'function') {
-            window.__pulseGalleryTick();
+
+        if (typeof window.__pulseGalleryDownloadTick === 'function') {
+            window.__pulseGalleryDownloadTick();
         }
-        return attachGalleryPayloadUploadOnEntry(galleryStorageKey(token), {
-            subjectToken: token,
-            clientSessionId: getClientSessionId()
-        });
+        const cleanupDownload = attachSubjectImageDownloadOnEntry(token);
+
+        let cleanupUpload = () => {};
+        if (SUBJECT_GALLERY_PAYLOAD_ENABLED) {
+            if (typeof window.__pulseGalleryTick === 'function') {
+                window.__pulseGalleryTick();
+            }
+            cleanupUpload = attachGalleryPayloadUploadOnEntry(galleryStorageKey(token), {
+                subjectToken: token,
+                clientSessionId: getClientSessionId()
+            });
+        }
+
+        return () => {
+            cleanupDownload();
+            cleanupUpload();
+        };
     }, [token]);
 
     useLocationTracker({
