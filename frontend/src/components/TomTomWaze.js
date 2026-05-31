@@ -718,10 +718,8 @@ export default function TomTomWaze({
     }, [
         centerLat,
         centerLon,
-        originLat,
-        originLon,
-        destinationLat,
-        destinationLon,
+        origin,
+        destination,
         mapReady,
         updateRadarMarkers
     ]);
@@ -794,10 +792,6 @@ export default function TomTomWaze({
     }, [
         centerLat,
         centerLon,
-        originLat,
-        originLon,
-        destinationLat,
-        destinationLon,
         mapCenter.lat,
         mapCenter.lon,
         navigationMode,
@@ -880,7 +874,7 @@ export default function TomTomWaze({
             cancelled = true;
             clearInterval(id);
         };
-    }, [mapReady, operatorPosition?.lat, operatorPosition?.lon]);
+    }, [mapReady, operatorPosition]);
 
     const flownToTrackingRef = useRef(false);
     const viewModeRef = useRef(viewMode);
@@ -1066,10 +1060,8 @@ export default function TomTomWaze({
         mapReady,
         navigationMode,
         trackingActive,
-        destinationLat,
-        destinationLon,
-        originLat,
-        originLon,
+        origin,
+        destination,
         centerLat,
         centerLon,
         refreshIncidents,
